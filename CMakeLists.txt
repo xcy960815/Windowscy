@@ -8,6 +8,11 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 
 option(MACCY_BUILD_TESTS "Build unit tests" ON)
 
+if(MSVC AND NOT DEFINED CMAKE_MSVC_RUNTIME_LIBRARY)
+  # Produce self-contained release binaries that do not require the VC++ redistributable.
+  set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
+endif()
+
 if(NOT WIN32)
   message(STATUS "Non-Windows host detected. Building portable core/test targets only.")
 endif()
