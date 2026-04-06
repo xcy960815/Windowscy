@@ -40,6 +40,7 @@ struct AppSettings {
   PinPosition pin_position = PinPosition::kTop;
   HistorySortOrder sort_order = HistorySortOrder::kLastCopied;
   SearchMode search_mode = SearchMode::kMixed;
+  bool show_startup_guide = true;
   bool capture_enabled = true;
   bool auto_paste = true;
   bool paste_plain_text = false;

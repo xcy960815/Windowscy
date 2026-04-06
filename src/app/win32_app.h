@@ -74,6 +74,7 @@ class Win32App {
   void ApplyStoreOptions();
   void LoadHistory();
   void PersistHistory() const;
+  void ShowStartupGuide();
   void TogglePopup();
   void ShowPopup();
   void HidePopup();
@@ -126,6 +127,7 @@ class Win32App {
   WNDPROC original_search_edit_proc_ = nullptr;
   WNDPROC original_list_box_proc_ = nullptr;
   UINT taskbar_created_message_ = 0;
+  bool toggle_hotkey_registered_ = false;
   bool ignore_next_clipboard_update_ = false;
   bool capture_enabled_ = true;
   bool ignore_next_external_copy_ = false;

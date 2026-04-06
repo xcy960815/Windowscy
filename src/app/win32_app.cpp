@@ -11,6 +11,7 @@
 #include <optional>
 #include <sstream>
 #include <string>
+#include <string_view>
 #include <system_error>
 #include <vector>
 
@@ -33,6 +34,11 @@ constexpr wchar_t kControllerWindowClass[] = L"MaccyWindowsController";
 constexpr wchar_t kPopupWindowClass[] = L"MaccyWindowsPopup";
 constexpr wchar_t kPinEditorWindowClass[] = L"MaccyWindowsPinEditor";
 constexpr wchar_t kWindowTitle[] = L"Maccy Windows";
+
+void ShowDialog(HWND owner, std::wstring_view message, UINT flags) {
+  const std::wstring text(message);
+  MessageBoxW(owner, text.c_str(), kWindowTitle, MB_OK | flags);
+}
 
 RECT MonitorWorkAreaForPoint(POINT point) {
   RECT work_area{0, 0, 1280, 720};
@@ -296,19 +302,40 @@ bool Win32App::Initialize(HINSTANCE instance) {
     return false;
   }
 
-  SetupTrayIcon();
-  RegisterHotKey(controller_window_, kToggleHotKeyId, MOD_CONTROL | MOD_SHIFT | MOD_NOREPEAT, 'C');
+  if (!SetupTrayIcon()) {
+    ShowDialog(
+        controller_window_,
+        L"Couldn't create the notification area icon. Maccy Windows can't be used without the tray icon.",
+        MB_ICONERROR);
+    return false;
+  }
+
+  toggle_hotkey_registered_ =
+      RegisterHotKey(controller_window_, kToggleHotKeyId, MOD_CONTROL | MOD_SHIFT | MOD_NOREPEAT, 'C') != FALSE;
+  if (!toggle_hotkey_registered_) {
+    ShowDialog(
+        controller_window_,
+        L"Couldn't register the global hotkey Ctrl+Shift+C.\n\n"
+        L"Maccy Windows is still running. Open it from the tray icon in the notification area instead.",
+        MB_ICONWARNING);
+    settings_.show_startup_guide = false;
+  }
+
   AddClipboardFormatListener(controller_window_);
   LoadHistory();
   RefreshPopupList();
   UpdateTrayIcon();
+  ShowStartupGuide();
   return true;
 }
 
 void Win32App::Shutdown() {
   if (controller_window_ != nullptr) {
     RemoveClipboardFormatListener(controller_window_);
-    UnregisterHotKey(controller_window_, kToggleHotKeyId);
+    if (toggle_hotkey_registered_) {
+      UnregisterHotKey(controller_window_, kToggleHotKeyId);
+      toggle_hotkey_registered_ = false;
+    }
   }
 
   RemoveTrayIcon();
@@ -762,6 +789,21 @@ void Win32App::PersistHistory() const {
   if (!history_path_.empty()) {
     (void)SaveHistoryFile(history_path_, store_.items());
   }
+}
+
+void Win32App::ShowStartupGuide() {
+  if (!settings_.show_startup_guide || !toggle_hotkey_registered_) {
+    return;
+  }
+
+  ShowDialog(
+      controller_window_,
+      L"Maccy Windows is running in the notification area.\n\n"
+      L"Press Ctrl+Shift+C or click the tray icon to open clipboard history.",
+      MB_ICONINFORMATION);
+
+  settings_.show_startup_guide = false;
+  PersistSettings();
 }
 
 void Win32App::TogglePopup() {

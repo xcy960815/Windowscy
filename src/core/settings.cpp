@@ -205,6 +205,7 @@ bool SaveSettingsFile(
   write_line("pin_position", std::string(ToString(settings.pin_position)));
   write_line("sort_order", std::string(ToString(settings.sort_order)));
   write_line("search_mode", std::string(ToString(settings.search_mode)));
+  write_line("show_startup_guide", settings.show_startup_guide ? "1" : "0");
   write_line("capture_enabled", settings.capture_enabled ? "1" : "0");
   write_line("auto_paste", settings.auto_paste ? "1" : "0");
   write_line("paste_plain_text", settings.paste_plain_text ? "1" : "0");
@@ -276,6 +277,8 @@ AppSettings LoadSettingsFile(const std::filesystem::path& path) {
       settings.sort_order = ParseHistorySortOrder(value);
     } else if (fields[0] == "search_mode") {
       settings.search_mode = ParseSearchMode(value);
+    } else if (fields[0] == "show_startup_guide") {
+      settings.show_startup_guide = ParseBool(value);
     } else if (fields[0] == "capture_enabled") {
       settings.capture_enabled = ParseBool(value);
     } else if (fields[0] == "auto_paste") {

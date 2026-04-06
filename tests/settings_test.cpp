@@ -13,6 +13,7 @@ int main() {
   original.pin_position = maccy::PinPosition::kBottom;
   original.sort_order = maccy::HistorySortOrder::kCopyCount;
   original.search_mode = maccy::SearchMode::kRegexp;
+  original.show_startup_guide = false;
   original.capture_enabled = false;
   original.auto_paste = false;
   original.paste_plain_text = true;
@@ -45,6 +46,7 @@ int main() {
   assert(loaded.pin_position == original.pin_position);
   assert(loaded.sort_order == original.sort_order);
   assert(loaded.search_mode == original.search_mode);
+  assert(loaded.show_startup_guide == original.show_startup_guide);
   assert(loaded.capture_enabled == original.capture_enabled);
   assert(loaded.auto_paste == original.auto_paste);
   assert(loaded.paste_plain_text == original.paste_plain_text);
