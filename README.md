@@ -1,4 +1,4 @@
-# Maccy Windows Clone
+# ClipLoom
 
 A standalone Windows clipboard manager inspired by the current Maccy feature set.
 
@@ -29,7 +29,7 @@ Still missing or incomplete:
 
 ## How To Use
 
-1. Launch `maccy_win.exe`.
+1. Launch `ClipLoom.exe`.
 2. Look for the app in the Windows notification area tray.
 3. Open clipboard history with the configured global hotkey. The default is `Ctrl+Shift+C`.
 4. If that hotkey is busy, click the tray icon instead.
@@ -104,7 +104,9 @@ Available settings today:
 
 ## Data Storage
 
-The app currently stores its data under the current user's local app data directory in a `MaccyWindows` folder.
+The app stores its data under the current user's local app data directory in a `ClipLoom` folder.
+
+For migration compatibility, if an existing `MaccyWindows` data folder is present and `ClipLoom` is not yet created, it will continue using the legacy folder.
 
 It persists:
 
@@ -133,6 +135,8 @@ The original planning notes mentioned SQLite, but the current build uses a light
 
 - `docs/windows-maccy-clone-todolist.md`
 - `docs/tech-stack-decision.md`
+- `docs/ui-upgrade-options.md`
+- `docs/win32-app-split-todolist.md`
 - `docs/github-actions-windows-build-notes.md`
 
 ## CI

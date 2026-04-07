@@ -18,7 +18,7 @@ else()
 endif()
 
 if(WIN32)
-  add_executable(maccy_win WIN32
+  add_executable(ClipLoom WIN32
     app/main_win32.cpp
     app/resources/maccy.rc
     app/win32_app.cpp
@@ -29,14 +29,14 @@ if(WIN32)
     platform/win32/utf.cpp
   )
 
-  target_compile_definitions(maccy_win PRIVATE
+  target_compile_definitions(ClipLoom PRIVATE
     UNICODE
     _UNICODE
     WIN32_LEAN_AND_MEAN
     NOMINMAX
   )
 
-  target_link_libraries(maccy_win PRIVATE
+  target_link_libraries(ClipLoom PRIVATE
     maccy_core
     advapi32
     comctl32
@@ -47,9 +47,9 @@ if(WIN32)
   )
 
   if(MSVC)
-    target_compile_options(maccy_win PRIVATE /W4 /permissive- /EHsc /utf-8 /O1 /Gy /Gw)
-    target_link_options(maccy_win PRIVATE /INCREMENTAL:NO /OPT:REF /OPT:ICF)
+    target_compile_options(ClipLoom PRIVATE /W4 /permissive- /EHsc /utf-8 /O1 /Gy /Gw)
+    target_link_options(ClipLoom PRIVATE /INCREMENTAL:NO /OPT:REF /OPT:ICF)
   endif()
 
-  install(TARGETS maccy_win RUNTIME DESTINATION .)
+  install(TARGETS ClipLoom RUNTIME DESTINATION .)
 endif()

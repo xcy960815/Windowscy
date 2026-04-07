@@ -34,13 +34,13 @@ jobs:
 
       - name: Archive package
         shell: pwsh
-        run: Compress-Archive -Path package\* -DestinationPath maccy-windows-x64.zip
+        run: Compress-Archive -Path package\* -DestinationPath cliploom-x64.zip
 
       - name: Upload release artifact
         uses: actions/upload-artifact@v6
         with:
-          name: maccy-windows-x64
-          path: maccy-windows-x64.zip
+          name: cliploom-x64
+          path: cliploom-x64.zip
           if-no-files-found: error
 
       - name: Publish GitHub Release
@@ -50,7 +50,7 @@ jobs:
           RELEASE_TAG: ${{ github.ref_name }}
         run: |
           $tag = $env:RELEASE_TAG
-          $asset = "maccy-windows-x64.zip"
+          $asset = "cliploom-x64.zip"
           $notes = "Automated Windows build for $tag."
 
           gh release view $tag *> $null

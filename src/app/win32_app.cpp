@@ -38,17 +38,17 @@ namespace maccy {
 namespace {
 
 /** 控制器窗口类名称 */
-constexpr wchar_t kControllerWindowClass[] = L"MaccyWindowsController";
+constexpr wchar_t kControllerWindowClass[] = L"ClipLoomController";
 /** 弹窗窗口类名称 */
-constexpr wchar_t kPopupWindowClass[] = L"MaccyWindowsPopup";
+constexpr wchar_t kPopupWindowClass[] = L"ClipLoomPopup";
 /** 固定编辑器窗口类名称 */
-constexpr wchar_t kPinEditorWindowClass[] = L"MaccyWindowsPinEditor";
+constexpr wchar_t kPinEditorWindowClass[] = L"ClipLoomPinEditor";
 /** 设置窗口类名称 */
-constexpr wchar_t kSettingsWindowClass[] = L"MaccyWindowsSettings";
+constexpr wchar_t kSettingsWindowClass[] = L"ClipLoomSettings";
 /** 窗口标题 */
-constexpr wchar_t kWindowTitle[] = L"Maccy Windows";
+constexpr wchar_t kWindowTitle[] = L"ClipLoom";
 /** 单实例互斥体名称 */
-constexpr wchar_t kSingleInstanceMutexName[] = L"Local\\MaccyWindowsSingleInstance";
+constexpr wchar_t kSingleInstanceMutexName[] = L"Local\\ClipLoomSingleInstance";
 /** 激活已存在实例的消息 */
 constexpr UINT kActivateExistingInstanceMessage = WM_APP + 2;
 /** 双击修饰符触发消息 */
@@ -218,12 +218,32 @@ DWORD PopupWindowStyle() {
  * @return std::filesystem::path 应用数据目录路径
  */
 std::filesystem::path ResolveAppDataDirectory() {
+  constexpr std::string_view kCurrentFolderName = "ClipLoom";
+  constexpr std::string_view kLegacyFolderName = "MaccyWindows";
+
+  const auto preferred_path = [](const std::filesystem::path& base) {
+    const auto current = base / kCurrentFolderName;
+    const auto legacy = base / kLegacyFolderName;
+    std::error_code error;
+
+    if (std::filesystem::exists(current, error)) {
+      return current;
+    }
+
+    error.clear();
+    if (std::filesystem::exists(legacy, error)) {
+      return legacy;
+    }
+
+    return current;
+  };
+
   wchar_t* local_app_data = nullptr;
   std::size_t length = 0;
   if (_wdupenv_s(&local_app_data, &length, L"LOCALAPPDATA") == 0 &&
       local_app_data != nullptr &&
       *local_app_data != L'\0') {
-    const std::filesystem::path path = std::filesystem::path(local_app_data) / "MaccyWindows";
+    const std::filesystem::path path = preferred_path(std::filesystem::path(local_app_data));
     std::free(local_app_data);
     return path;
   }
@@ -232,7 +252,7 @@ std::filesystem::path ResolveAppDataDirectory() {
     std::free(local_app_data);
   }
 
-  return std::filesystem::current_path() / "MaccyWindows";
+  return preferred_path(std::filesystem::current_path());
 }
 
 /**
@@ -318,7 +338,7 @@ std::wstring DoubleClickModifierRecorderText(
  * @return std::wstring 托盘提示文本
  */
 std::wstring BuildTrayTooltip(bool use_chinese_ui, bool capture_enabled, const HistoryStore& store) {
-  std::wstring tooltip = L"Maccy Windows";
+  std::wstring tooltip = L"ClipLoom";
   if (!capture_enabled) {
     tooltip += UiText(use_chinese_ui, L" (Paused)", L"（已暂停）");
   } else if (!store.items().empty()) {
@@ -1177,8 +1197,8 @@ bool Win32App::Initialize(HINSTANCE instance) {
         controller_window_,
         UiText(
             use_chinese_ui_,
-            L"Couldn't create the notification area icon. Maccy Windows can't be used without the tray icon.",
-            L"无法创建通知区域图标。缺少托盘图标时，Maccy Windows 无法使用。"),
+            L"Couldn't create the notification area icon. ClipLoom can't be used without the tray icon.",
+            L"无法创建通知区域图标。缺少托盘图标时，ClipLoom 无法使用。"),
         MB_ICONERROR);
     return false;
   }
@@ -1200,8 +1220,8 @@ bool Win32App::Initialize(HINSTANCE instance) {
           std::wstring(UiText(use_chinese_ui_, L"Couldn't register the global hotkey ", L"无法注册全局快捷键 ")) +
           DescribeOpenTrigger(use_chinese_ui_, settings_) + UiText(
                                                             use_chinese_ui_,
-                                                            L".\n\nMaccy Windows is still running. Open it from the tray icon in the notification area instead.",
-                                                            L"。\n\nMaccy Windows 仍在后台运行。请改为通过通知区域托盘图标打开。");
+                                                            L".\n\nClipLoom is still running. Open it from the tray icon in the notification area instead.",
+                                                            L"。\n\nClipLoom 仍在后台运行。请改为通过通知区域托盘图标打开。");
     }
     ShowDialog(controller_window_, warning, MB_ICONWARNING);
     settings_.show_startup_guide = false;
@@ -1810,7 +1830,7 @@ void Win32App::OpenSettingsWindow() {
   settings_window_ = CreateWindowExW(
       window_ex_style,
       kSettingsWindowClass,
-      UiText(use_chinese_ui_, L"Maccy Windows Settings", L"Maccy Windows 设置"),
+      UiText(use_chinese_ui_, L"ClipLoom Settings", L"ClipLoom 设置"),
       window_style,
       CW_USEDEFAULT,
       CW_USEDEFAULT,
@@ -2101,8 +2121,8 @@ void Win32App::ShowStartupGuide() {
 
   std::wstring message = UiText(
       use_chinese_ui_,
-      L"Maccy Windows is running in the notification area.\n\n",
-      L"Maccy Windows 正在通知区域运行。\n\n");
+      L"ClipLoom is running in the notification area.\n\n",
+      L"ClipLoom 正在通知区域运行。\n\n");
   if (open_trigger_configuration == PopupOpenTriggerConfiguration::kDoubleClick) {
     message += UiText(use_chinese_ui_, L"Double-click ", L"双击 ");
     message += DoubleClickModifierLabel(use_chinese_ui_, settings_.double_click_modifier_key);

@@ -18,7 +18,9 @@ namespace {
 /** 注册表运行键路径 */
 constexpr wchar_t kRunKeyPath[] = L"Software\\Microsoft\\Windows\\CurrentVersion\\Run";
 /** 注册表值名称 */
-constexpr wchar_t kRunValueName[] = L"MaccyWindows";
+constexpr wchar_t kRunValueName[] = L"ClipLoom";
+/** 兼容旧版本注册表值名称 */
+constexpr wchar_t kLegacyRunValueName[] = L"MaccyWindows";
 
 /**
  * @brief 获取当前可执行文件路径
@@ -45,24 +47,29 @@ bool IsStartOnLoginEnabled() {
     return false;
   }
 
-  std::wstring value(1024, L'\0');
-  DWORD value_type = REG_SZ;
-  DWORD bytes = static_cast<DWORD>(value.size() * sizeof(wchar_t));
-  const LONG result = RegQueryValueExW(
-      key,
-      kRunValueName,
-      nullptr,
-      &value_type,
-      reinterpret_cast<LPBYTE>(value.data()),
-      &bytes);
+  const auto has_non_empty_value = [key](const wchar_t* value_name) {
+    std::wstring value(1024, L'\0');
+    DWORD value_type = REG_SZ;
+    DWORD bytes = static_cast<DWORD>(value.size() * sizeof(wchar_t));
+    const LONG result = RegQueryValueExW(
+        key,
+        value_name,
+        nullptr,
+        &value_type,
+        reinterpret_cast<LPBYTE>(value.data()),
+        &bytes);
+
+    if (result != ERROR_SUCCESS || value_type != REG_SZ || bytes < sizeof(wchar_t)) {
+      return false;
+    }
+
+    value.resize((bytes / sizeof(wchar_t)) - 1);
+    return !value.empty();
+  };
+
+  const bool enabled = has_non_empty_value(kRunValueName) || has_non_empty_value(kLegacyRunValueName);
   RegCloseKey(key);
-
-  if (result != ERROR_SUCCESS || value_type != REG_SZ || bytes < sizeof(wchar_t)) {
-    return false;
-  }
-
-  value.resize((bytes / sizeof(wchar_t)) - 1);
-  return !value.empty();
+  return enabled;
 }
 
 bool SetStartOnLogin(bool enabled) {
@@ -81,6 +88,14 @@ bool SetStartOnLogin(bool enabled) {
   }
 
   LONG result = ERROR_SUCCESS;
+  const auto delete_value_if_exists = [key](const wchar_t* value_name) {
+    LONG remove_result = RegDeleteValueW(key, value_name);
+    if (remove_result == ERROR_FILE_NOT_FOUND) {
+      remove_result = ERROR_SUCCESS;
+    }
+    return remove_result;
+  };
+
   if (enabled) {
     const std::wstring command = L"\"" + CurrentExecutablePath() + L"\"";
     result = RegSetValueExW(
@@ -90,10 +105,13 @@ bool SetStartOnLogin(bool enabled) {
         REG_SZ,
         reinterpret_cast<const BYTE*>(command.c_str()),
         static_cast<DWORD>((command.size() + 1) * sizeof(wchar_t)));
+    if (result == ERROR_SUCCESS) {
+      (void)delete_value_if_exists(kLegacyRunValueName);
+    }
   } else {
-    result = RegDeleteValueW(key, kRunValueName);
-    if (result == ERROR_FILE_NOT_FOUND) {
-      result = ERROR_SUCCESS;
+    result = delete_value_if_exists(kRunValueName);
+    if (result == ERROR_SUCCESS) {
+      result = delete_value_if_exists(kLegacyRunValueName);
     }
   }
 
