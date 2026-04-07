@@ -36,11 +36,11 @@ jobs:
 
       - name: Archive package
         shell: pwsh
-        run: Compress-Archive -Path package\* -DestinationPath cliploom-x64.zip
+        run: Compress-Archive -Path package\* -DestinationPath cliploom.zip
 
       - name: Upload executable package
         uses: actions/upload-artifact@v6
         with:
-          name: cliploom-x64
-          path: cliploom-x64.zip
+          name: cliploom
+          path: cliploom.zip
           if-no-files-found: error

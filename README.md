@@ -1,149 +1,148 @@
 # ClipLoom
 
-A standalone Windows clipboard manager inspired by the current Maccy feature set.
+ClipLoom is a Windows-native clipboard manager focused on fast search, reliable history, and keyboard-first workflows.
 
-## Goal
+中文文档请看：[docs/项目说明-中文.md](docs/%E9%A1%B9%E7%9B%AE%E8%AF%B4%E6%98%8E-%E4%B8%AD%E6%96%87.md)
 
-Create a Windows clipboard manager that matches the current Maccy feature set as closely as possible, with Windows-native behavior where the platforms differ.
+## Overview
 
-## Current Status
+ClipLoom runs in the Windows notification area, captures clipboard content, and lets you reopen history with a global shortcut or configured trigger.
 
-The current build is already usable on Windows and includes:
+Current core capabilities:
 
-- clipboard monitoring and history persistence
-- text, HTML, RTF, image, and file list capture
-- search with exact, fuzzy, regexp, and mixed modes
-- search result highlight
-- tray icon, tray menu, and global hotkey popup
+- clipboard monitoring with persistence
+- text, HTML, RTF, image, and file-list capture
+- exact, fuzzy, regexp, and mixed search
+- highlighted search matches
+- tray icon and tray quick actions
+- configurable global open hotkey
+- optional double-click modifier trigger
 - preview pane
-- pinning, pin rename, and pinned text editing
-- auto paste and plain text paste options
-- ignore rules, startup registration, history limit, and sorting
-- single-instance startup behavior
+- pin/unpin, rename pin, edit pinned plain text
+- ignore rules and startup registration
+- single-instance behavior
 
-Still missing or incomplete:
+Known gaps still on roadmap:
 
 - image preview zoom
-- double-tap modifier activation
-- OCR, updater, scripting interface, and richer diagnostics
+- OCR and updater
+- scripting interface and diagnostics improvements
 
-## How To Use
+## Quick Start
 
-1. Launch `ClipLoom.exe`.
-2. Look for the app in the Windows notification area tray.
-3. Open clipboard history with the configured global hotkey. The default is `Ctrl+Shift+C`.
-4. If that hotkey is busy, click the tray icon instead.
-5. Copy text, images, files, or rich text as usual with `Ctrl+C`.
-6. Open the popup and search or browse your saved history.
-7. Press `Enter` on the selected item to restore it to the clipboard.
+1. Download the latest release asset: `cliploom.zip`.
+2. Extract it to a local folder.
+3. Run `ClipLoom.exe`.
+4. Open history with your configured hotkey (default `Ctrl+Shift+C`) or tray icon.
 
-By default, selecting an item also auto-pastes it back into the previous window.
+## Build From Source
 
-## Keyboard Shortcuts
+### Prerequisites
 
-- configured global hotkey: open the history popup
-- `Up` / `Down`: move through the list
-- `Enter`: activate the selected item
-- `Esc`: close the popup
-- `Delete`: remove the selected history item
-- `Ctrl+P`: pin or unpin the selected item
-- `Ctrl+R`: rename a pinned item
+- Windows 10/11 x64
+- Visual Studio 2022 (Desktop development with C++)
+- CMake 3.25+
+
+### Configure, Build, Test
+
+```powershell
+cmake -S . -B build -G "Visual Studio 17 2022" -A x64 -DMACCY_BUILD_TESTS=ON
+cmake --build build --config Release --parallel
+ctest --test-dir build -C Release --output-on-failure
+```
+
+### Package
+
+```powershell
+cmake --install build --config Release --prefix package
+Compress-Archive -Path package\* -DestinationPath cliploom.zip
+```
+
+## Usage Basics
+
+- `Up` / `Down`: move selection
+- `Enter`: activate selected history item
+- `Esc`: close popup
+- `Delete`: remove selected item
+- `Ctrl+P`: pin / unpin
+- `Ctrl+R`: rename pinned item
 - `Ctrl+E`: edit pinned plain text
-- `Ctrl+1` to `Ctrl+9`: jump to the first 9 visible items
+- `Ctrl+1` to `Ctrl+9`: jump to top visible items
 
-## Settings
+## Configuration
 
-Settings are available from both a dedicated tabbed settings window and the tray menu.
+Open settings from tray:
 
-To open settings:
-
-1. Right-click the tray icon.
+1. Right-click tray icon.
 2. Click `Settings...`.
 
-You can still use the grouped tray menu sections for quick toggles.
+Settings include:
 
-Available settings today:
+- open trigger (hotkey / double-click modifier)
+- capture behavior (auto paste, plain text paste)
+- storage policy (history limit, sort order, capture formats)
+- appearance options (search visibility, preview pane, popup position)
+- ignore rules (apps, patterns, formats)
+- advanced cleanup options
 
-- `General`
-  - configurable global open hotkey
-  - optional double-click modifier key open trigger
-  - enable clipboard capture
-  - auto paste
-  - paste plain text
-  - start on login
-  - startup guide
-  - search mode
-- `Storage`
-  - history limit
-  - sort order
-  - save plain text / HTML / rich text / images / file lists
-- `Appearance`
-  - show search field
-  - show preview pane
-  - remember popup position
-  - pins on top / bottom
-- `Pins`
-  - quick reference for pin management shortcuts in the popup
-- `Ignore`
-  - ignore all captures
-  - only capture listed applications
-  - ignored applications
-  - allowed applications
-  - ignored text patterns
-  - ignored content formats
-- `Advanced`
-  - clear unpinned history on exit
-  - clear system clipboard on exit
-- tray quick actions
-  - `Show History`
-  - `Pause Capture`
-  - `Ignore Next Copy`
-  - `Clear History`
-  - `Clear All History`
-  - `Exit`
+## Data and Migration
 
-## Data Storage
+Default data location:
 
-The app stores its data under the current user's local app data directory in a `ClipLoom` folder.
+- `%LOCALAPPDATA%\ClipLoom`
 
-For migration compatibility, if an existing `MaccyWindows` data folder is present and `ClipLoom` is not yet created, it will continue using the legacy folder.
+Migration compatibility:
 
-It persists:
+- if `%LOCALAPPDATA%\MaccyWindows` exists and `ClipLoom` does not, ClipLoom will continue using the legacy folder
+
+Persisted data includes:
 
 - history items
-- pin state and pinned edits
-- popup size and last position
-- search mode and sort mode
+- pin metadata and pinned edits
+- popup placement and UI preferences
 - capture and ignore settings
 - startup preference
 
-## Chosen Stack
+## Architecture
 
-The current implementation uses:
+- `src/core`: platform-agnostic domain logic
+- `src/platform/win32`: Win32 integration layer (clipboard, input, startup, source app)
+- `src/app`: Win32 app shell, windows, tray, settings, popup
+- `tests`: unit tests for core behavior
 
-- `C++20 + Win32 API + CMake`
+## Development Workflow
 
-The original planning notes mentioned SQLite, but the current build uses a lightweight custom persistence format instead.
+1. Create a feature branch from `main`.
+2. Implement changes with small commits.
+3. Run local build and tests.
+4. Open a pull request to `main`.
+5. Ensure `build-windows` workflow is green before merge.
 
-## Layout
+Recommended local checks:
 
-- `docs/`: planning and design notes
-- `src/`: application source code
-- `tests/`: unit tests
+```powershell
+cmake --build build --config Release --parallel
+ctest --test-dir build -C Release --output-on-failure
+```
 
-## Docs
+## Release Workflow
 
+Release is tag-driven:
+
+1. Merge release-ready code into `main`.
+2. Create and push a version tag: `v*` (for example `v0.2.17`).
+3. `release-windows.yml` builds and publishes `cliploom.zip` to GitHub Releases.
+
+CI workflows:
+
+- `.github/workflows/build-windows.yml`
+- `.github/workflows/release-windows.yml`
+
+## Documentation
+
+- `docs/项目说明-中文.md`
 - `docs/windows-maccy-clone-todolist.md`
 - `docs/tech-stack-decision.md`
 - `docs/ui-upgrade-options.md`
 - `docs/win32-app-split-todolist.md`
 - `docs/github-actions-windows-build-notes.md`
-
-## CI
-
-GitHub Actions workflows:
-
-- `.github/workflows/build-windows.yml`
-- `.github/workflows/release-windows.yml`
-
-They build on `windows-2022`, run tests, package the app, and publish release zip artifacts for tagged versions.
