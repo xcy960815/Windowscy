@@ -1,5 +1,7 @@
 build/
 package/
+.claude
+.claude/
 *.zip
 *.user
 *.suo
