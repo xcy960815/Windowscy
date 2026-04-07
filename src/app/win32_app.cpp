@@ -165,6 +165,8 @@ const wchar_t* UiText(bool use_chinese_ui, const wchar_t* english, const wchar_t
   return use_chinese_ui ? chinese : english;
 }
 
+std::uint32_t ModifierFlagsForVirtualKey(DWORD virtual_key);
+
 const wchar_t* DoubleClickModifierLabel(bool use_chinese_ui, DoubleClickModifierKey key) {
   switch (key) {
     case DoubleClickModifierKey::kAlt:
