@@ -39,6 +39,7 @@ constexpr wchar_t kSettingsWindowClass[] = L"MaccyWindowsSettings";
 constexpr wchar_t kWindowTitle[] = L"Maccy Windows";
 constexpr wchar_t kSingleInstanceMutexName[] = L"Local\\MaccyWindowsSingleInstance";
 constexpr UINT kActivateExistingInstanceMessage = WM_APP + 2;
+constexpr UINT kDoubleClickModifierTriggeredMessage = WM_APP + 3;
 constexpr int kSettingsClientWidth = 920;
 constexpr int kSettingsClientHeight = 690;
 constexpr int kSettingsTabControlId = 2100;
@@ -49,6 +50,11 @@ constexpr std::uint32_t kHotKeyModAlt = 0x0001;
 constexpr std::uint32_t kHotKeyModControl = 0x0002;
 constexpr std::uint32_t kHotKeyModShift = 0x0004;
 constexpr std::uint32_t kHotKeyModWin = 0x0008;
+
+enum class PopupOpenTriggerConfiguration {
+  kRegularShortcut,
+  kDoubleClick,
+};
 
 struct HotKeyChoice {
   std::uint32_t virtual_key = 0;
@@ -67,6 +73,18 @@ constexpr HotKeyChoice kPopupHotKeyChoices[] = {
     {VK_F9, L"F9"},   {VK_F10, L"F10"}, {VK_F11, L"F11"}, {VK_F12, L"F12"},
     {VK_SPACE, L"Space"},
 };
+
+Win32App* g_keyboard_hook_target = nullptr;
+
+PopupOpenTriggerConfiguration OpenTriggerConfigurationForSettings(const AppSettings& settings) {
+  if (settings.double_click_popup_enabled && settings.double_click_modifier_key != DoubleClickModifierKey::kNone) {
+    return PopupOpenTriggerConfiguration::kDoubleClick;
+  }
+
+  return PopupOpenTriggerConfiguration::kRegularShortcut;
+}
+
+int GetComboSelection(HWND combo, int fallback_index);
 
 void ShowDialog(HWND owner, std::wstring_view message, UINT flags) {
   const std::wstring text(message);
@@ -147,6 +165,48 @@ const wchar_t* UiText(bool use_chinese_ui, const wchar_t* english, const wchar_t
   return use_chinese_ui ? chinese : english;
 }
 
+const wchar_t* DoubleClickModifierLabel(bool use_chinese_ui, DoubleClickModifierKey key) {
+  switch (key) {
+    case DoubleClickModifierKey::kAlt:
+      return L"Alt";
+    case DoubleClickModifierKey::kShift:
+      return L"Shift";
+    case DoubleClickModifierKey::kControl:
+      return L"Ctrl";
+    case DoubleClickModifierKey::kNone:
+    default:
+      return UiText(use_chinese_ui, L"Not Set", L"未设置");
+  }
+}
+
+int DoubleClickModifierComboIndex(DoubleClickModifierKey key) {
+  switch (key) {
+    case DoubleClickModifierKey::kAlt:
+      return 1;
+    case DoubleClickModifierKey::kShift:
+      return 2;
+    case DoubleClickModifierKey::kControl:
+      return 3;
+    case DoubleClickModifierKey::kNone:
+    default:
+      return 0;
+  }
+}
+
+DoubleClickModifierKey DoubleClickModifierFromComboSelection(HWND combo) {
+  switch (GetComboSelection(combo, 0)) {
+    case 1:
+      return DoubleClickModifierKey::kAlt;
+    case 2:
+      return DoubleClickModifierKey::kShift;
+    case 3:
+      return DoubleClickModifierKey::kControl;
+    case 0:
+    default:
+      return DoubleClickModifierKey::kNone;
+  }
+}
+
 std::wstring BuildTrayTooltip(bool use_chinese_ui, bool capture_enabled, const HistoryStore& store) {
   std::wstring tooltip = L"Maccy Windows";
   if (!capture_enabled) {
@@ -174,6 +234,36 @@ POINT TrayAnchorPoint(WPARAM wparam) {
   point.x = static_cast<LONG>(static_cast<short>(LOWORD(coordinates)));
   point.y = static_cast<LONG>(static_cast<short>(HIWORD(coordinates)));
   return point;
+}
+
+std::uint32_t ModifierFlagsForVirtualKey(DWORD virtual_key) {
+  switch (virtual_key) {
+    case VK_LMENU:
+    case VK_RMENU:
+    case VK_MENU:
+      return kDoubleClickModifierFlagAlt;
+    case VK_LSHIFT:
+    case VK_RSHIFT:
+    case VK_SHIFT:
+      return kDoubleClickModifierFlagShift;
+    case VK_LCONTROL:
+    case VK_RCONTROL:
+    case VK_CONTROL:
+      return kDoubleClickModifierFlagControl;
+    case VK_LWIN:
+    case VK_RWIN:
+      return kDoubleClickModifierFlagWin;
+    default:
+      return 0;
+  }
+}
+
+bool IsKeyboardKeyDownMessage(WPARAM message) {
+  return message == WM_KEYDOWN || message == WM_SYSKEYDOWN;
+}
+
+bool IsKeyboardKeyUpMessage(WPARAM message) {
+  return message == WM_KEYUP || message == WM_SYSKEYUP;
 }
 
 const wchar_t* PopupHotKeyLabel(bool use_chinese_ui, std::uint32_t virtual_key) {
@@ -613,6 +703,15 @@ std::wstring FormatPopupHotKey(bool use_chinese_ui, std::uint32_t modifiers, std
   return text;
 }
 
+std::wstring DescribeOpenTrigger(bool use_chinese_ui, const AppSettings& settings) {
+  if (OpenTriggerConfigurationForSettings(settings) == PopupOpenTriggerConfiguration::kDoubleClick) {
+    return std::wstring(UiText(use_chinese_ui, L"double-click ", L"双击 ")) +
+           DoubleClickModifierLabel(use_chinese_ui, settings.double_click_modifier_key);
+  }
+
+  return FormatPopupHotKey(use_chinese_ui, settings.popup_hotkey_modifiers, settings.popup_hotkey_virtual_key);
+}
+
 std::wstring ReadWindowText(HWND window) {
   if (window == nullptr) {
     return {};
@@ -740,20 +839,27 @@ bool Win32App::Initialize(HINSTANCE instance) {
     return false;
   }
 
-  toggle_hotkey_registered_ = RegisterToggleHotKey();
-  if (!toggle_hotkey_registered_) {
-    const std::wstring hotkey_text =
-        FormatPopupHotKey(use_chinese_ui_, settings_.popup_hotkey_modifiers, settings_.popup_hotkey_virtual_key);
-    const std::wstring warning =
-        std::wstring(UiText(use_chinese_ui_, L"Couldn't register the global hotkey ", L"无法注册全局快捷键 ")) +
-        hotkey_text + UiText(
-                          use_chinese_ui_,
-                          L".\n\nMaccy Windows is still running. Open it from the tray icon in the notification area instead.",
-                          L"。\n\nMaccy Windows 仍在后台运行。请改为通过通知区域托盘图标打开。");
-    ShowDialog(
-        controller_window_,
-        warning,
-        MB_ICONWARNING);
+  const PopupOpenTriggerConfiguration open_trigger_configuration = OpenTriggerConfigurationForSettings(settings_);
+  const bool open_trigger_registered = RefreshOpenTriggerRegistration();
+  if (!open_trigger_registered) {
+    std::wstring warning;
+    if (open_trigger_configuration == PopupOpenTriggerConfiguration::kDoubleClick) {
+      warning = std::wstring(
+                    UiText(
+                        use_chinese_ui_,
+                        L"Couldn't start listening for double-click modifier key open. Open it from the tray icon in the notification area instead.",
+                        L"无法启动“双击修饰键打开”监听。请改为通过通知区域托盘图标打开。")) +
+                UiText(use_chinese_ui_, L"\n\nRequested trigger: ", L"\n\n请求的触发方式：") +
+                DescribeOpenTrigger(use_chinese_ui_, settings_);
+    } else {
+      warning =
+          std::wstring(UiText(use_chinese_ui_, L"Couldn't register the global hotkey ", L"无法注册全局快捷键 ")) +
+          DescribeOpenTrigger(use_chinese_ui_, settings_) + UiText(
+                                                            use_chinese_ui_,
+                                                            L".\n\nMaccy Windows is still running. Open it from the tray icon in the notification area instead.",
+                                                            L"。\n\nMaccy Windows 仍在后台运行。请改为通过通知区域托盘图标打开。");
+    }
+    ShowDialog(controller_window_, warning, MB_ICONWARNING);
     settings_.show_startup_guide = false;
   }
 
@@ -769,6 +875,7 @@ void Win32App::Shutdown() {
   if (controller_window_ != nullptr) {
     RemoveClipboardFormatListener(controller_window_);
     UnregisterToggleHotKey();
+    StopDoubleClickMonitor();
   }
 
   RemoveTrayIcon();
@@ -897,6 +1004,20 @@ bool Win32App::CreatePopupWindow() {
   return popup_window_ != nullptr;
 }
 
+bool Win32App::RefreshOpenTriggerRegistration() {
+  UnregisterToggleHotKey();
+  StopDoubleClickMonitor();
+
+  switch (OpenTriggerConfigurationForSettings(settings_)) {
+    case PopupOpenTriggerConfiguration::kRegularShortcut:
+      return RegisterToggleHotKey();
+    case PopupOpenTriggerConfiguration::kDoubleClick:
+      return StartDoubleClickMonitor();
+  }
+
+  return false;
+}
+
 bool Win32App::RegisterToggleHotKey() {
   if (controller_window_ == nullptr) {
     return false;
@@ -916,6 +1037,25 @@ bool Win32App::RegisterToggleHotKey() {
           modifiers,
           static_cast<UINT>(settings_.popup_hotkey_virtual_key)) != FALSE;
   return toggle_hotkey_registered_;
+}
+
+bool Win32App::StartDoubleClickMonitor() {
+  if (controller_window_ == nullptr) {
+    return false;
+  }
+
+  StopDoubleClickMonitor();
+
+  active_double_click_modifier_flags_ = 0;
+  double_click_modifier_detector_.Reset();
+  g_keyboard_hook_target = this;
+  double_click_hook_ = SetWindowsHookExW(WH_KEYBOARD_LL, StaticLowLevelKeyboardProc, instance_, 0);
+  if (double_click_hook_ == nullptr) {
+    g_keyboard_hook_target = nullptr;
+    return false;
+  }
+
+  return true;
 }
 
 bool Win32App::SetupTrayIcon() {
@@ -956,6 +1096,18 @@ void Win32App::UnregisterToggleHotKey() {
   }
 
   toggle_hotkey_registered_ = false;
+}
+
+void Win32App::StopDoubleClickMonitor() {
+  if (double_click_hook_ != nullptr) {
+    UnhookWindowsHookEx(double_click_hook_);
+    double_click_hook_ = nullptr;
+  }
+  if (g_keyboard_hook_target == this) {
+    g_keyboard_hook_target = nullptr;
+  }
+  active_double_click_modifier_flags_ = 0;
+  double_click_modifier_detector_.Reset();
 }
 
 void Win32App::ShowTrayMenu(const POINT* anchor) {
@@ -1362,8 +1514,12 @@ bool Win32App::ApplySettingsWindowChanges() {
 
   next_settings.popup_hotkey_modifiers = next_hotkey_modifiers;
   next_settings.popup_hotkey_virtual_key = PopupHotKeyVirtualKeyFromComboSelection(settings_hotkey_key_combo_);
+  next_settings.double_click_popup_enabled = IsCheckboxChecked(settings_double_click_open_check_);
+  next_settings.double_click_modifier_key = DoubleClickModifierFromComboSelection(settings_double_click_modifier_combo_);
+  const PopupOpenTriggerConfiguration requested_open_trigger = OpenTriggerConfigurationForSettings(next_settings);
 
-  if (!IsValidPopupHotKey(next_settings.popup_hotkey_modifiers, next_settings.popup_hotkey_virtual_key)) {
+  if (requested_open_trigger == PopupOpenTriggerConfiguration::kRegularShortcut &&
+      !IsValidPopupHotKey(next_settings.popup_hotkey_modifiers, next_settings.popup_hotkey_virtual_key)) {
     ShowDialog(
         settings_window_,
         UiText(
@@ -1417,23 +1573,27 @@ bool Win32App::ApplySettingsWindowChanges() {
 
   settings_ = std::move(next_settings);
   capture_enabled_ = next_capture_enabled;
-  if (!RegisterToggleHotKey()) {
+  if (!RefreshOpenTriggerRegistration()) {
     settings_ = previous_settings;
     capture_enabled_ = previous_capture_enabled;
-    (void)RegisterToggleHotKey();
+    (void)RefreshOpenTriggerRegistration();
 
-    const std::wstring hotkey_text =
-        FormatPopupHotKey(
-            use_chinese_ui_,
-            previous_settings.popup_hotkey_modifiers,
-            previous_settings.popup_hotkey_virtual_key);
-    const std::wstring warning =
-        std::wstring(
-            UiText(
-                use_chinese_ui_,
-                L"Couldn't register the selected open hotkey. The previous hotkey ",
-                L"无法注册你选择的打开快捷键。已恢复之前的快捷键 ")) +
-        hotkey_text + UiText(use_chinese_ui_, L" has been restored.", L"。");
+    std::wstring warning;
+    if (requested_open_trigger == PopupOpenTriggerConfiguration::kDoubleClick) {
+      warning = std::wstring(
+                    UiText(
+                        use_chinese_ui_,
+                        L"Couldn't start the selected double-click open trigger. The previous open trigger ",
+                        L"无法启动你选择的双击打开触发方式。已恢复之前的打开方式 ")) +
+                DescribeOpenTrigger(use_chinese_ui_, previous_settings) + UiText(use_chinese_ui_, L" has been restored.", L"。");
+    } else {
+      warning = std::wstring(
+                    UiText(
+                        use_chinese_ui_,
+                        L"Couldn't register the selected open hotkey. The previous open trigger ",
+                        L"无法注册你选择的打开快捷键。已恢复之前的打开方式 ")) +
+                DescribeOpenTrigger(use_chinese_ui_, previous_settings) + UiText(use_chinese_ui_, L" has been restored.", L"。");
+    }
     ShowDialog(settings_window_, warning, MB_ICONERROR);
     SyncSettingsWindowControls();
     return false;
@@ -1459,6 +1619,7 @@ void Win32App::SyncSettingsWindowControls() {
   SetCheckboxChecked(settings_auto_paste_check_, settings_.auto_paste);
   SetCheckboxChecked(settings_plain_text_check_, settings_.paste_plain_text);
   SetCheckboxChecked(settings_start_on_login_check_, settings_.start_on_login);
+  SetCheckboxChecked(settings_double_click_open_check_, settings_.double_click_popup_enabled);
   SetCheckboxChecked(settings_hotkey_ctrl_check_, (settings_.popup_hotkey_modifiers & kHotKeyModControl) != 0);
   SetCheckboxChecked(settings_hotkey_alt_check_, (settings_.popup_hotkey_modifiers & kHotKeyModAlt) != 0);
   SetCheckboxChecked(settings_hotkey_shift_check_, (settings_.popup_hotkey_modifiers & kHotKeyModShift) != 0);
@@ -1478,10 +1639,17 @@ void Win32App::SyncSettingsWindowControls() {
   SetCheckboxChecked(settings_capture_files_check_, settings_.ignore.capture_files);
 
   SetComboSelection(settings_hotkey_key_combo_, PopupHotKeyComboIndex(settings_.popup_hotkey_virtual_key));
+  SetComboSelection(
+      settings_double_click_modifier_combo_,
+      DoubleClickModifierComboIndex(settings_.double_click_modifier_key));
   SetComboSelection(settings_search_mode_combo_, SearchModeComboIndex(settings_.search_mode));
   SetComboSelection(settings_sort_order_combo_, SortOrderComboIndex(settings_.sort_order));
   SetComboSelection(settings_pin_position_combo_, PinPositionComboIndex(settings_.pin_position));
   SetComboSelection(settings_history_limit_combo_, HistoryLimitComboIndex(settings_.max_history_items));
+
+  if (settings_double_click_modifier_combo_ != nullptr) {
+    EnableWindow(settings_double_click_modifier_combo_, settings_.double_click_popup_enabled ? TRUE : FALSE);
+  }
 
   const std::wstring ignored_apps = JoinMultilineText(settings_.ignore.ignored_applications);
   const std::wstring allowed_apps = JoinMultilineText(settings_.ignore.allowed_applications);
@@ -1562,23 +1730,35 @@ void Win32App::PersistHistory() const {
 }
 
 void Win32App::ShowStartupGuide() {
-  if (!settings_.show_startup_guide || !toggle_hotkey_registered_) {
+  if (!settings_.show_startup_guide) {
     return;
   }
 
-  const std::wstring hotkey_text =
-      FormatPopupHotKey(use_chinese_ui_, settings_.popup_hotkey_modifiers, settings_.popup_hotkey_virtual_key);
-  const std::wstring message =
-      std::wstring(
-          UiText(
-              use_chinese_ui_,
-              L"Maccy Windows is running in the notification area.\n\nPress ",
-              L"Maccy Windows 正在通知区域运行。\n\n按下 ")) +
-      hotkey_text +
-      UiText(
-          use_chinese_ui_,
-          L" or click the tray icon to open clipboard history.",
-          L"，或点击托盘图标打开剪贴板历史记录。");
+  const PopupOpenTriggerConfiguration open_trigger_configuration = OpenTriggerConfigurationForSettings(settings_);
+  if ((open_trigger_configuration == PopupOpenTriggerConfiguration::kRegularShortcut && !toggle_hotkey_registered_) ||
+      (open_trigger_configuration == PopupOpenTriggerConfiguration::kDoubleClick && double_click_hook_ == nullptr)) {
+    return;
+  }
+
+  std::wstring message = UiText(
+      use_chinese_ui_,
+      L"Maccy Windows is running in the notification area.\n\n",
+      L"Maccy Windows 正在通知区域运行。\n\n");
+  if (open_trigger_configuration == PopupOpenTriggerConfiguration::kDoubleClick) {
+    message += UiText(use_chinese_ui_, L"Double-click ", L"双击 ");
+    message += DoubleClickModifierLabel(use_chinese_ui_, settings_.double_click_modifier_key);
+    message += UiText(
+        use_chinese_ui_,
+        L" to open clipboard history, or click the tray icon.",
+        L" 可打开剪贴板历史记录，或点击托盘图标。");
+  } else {
+    message += UiText(use_chinese_ui_, L"Press ", L"按下 ");
+    message += FormatPopupHotKey(use_chinese_ui_, settings_.popup_hotkey_modifiers, settings_.popup_hotkey_virtual_key);
+    message += UiText(
+        use_chinese_ui_,
+        L" or click the tray icon to open clipboard history.",
+        L"，或点击托盘图标打开剪贴板历史记录。");
+  }
   ShowDialog(
       controller_window_,
       message,
@@ -2150,6 +2330,44 @@ void Win32App::ActivateSelectedItem() {
   }
 }
 
+void Win32App::HandleGlobalKeyDown(DWORD virtual_key) {
+  const std::uint32_t modifier_flag = ModifierFlagsForVirtualKey(virtual_key);
+  if (modifier_flag != 0) {
+    if ((active_double_click_modifier_flags_ & modifier_flag) == 0) {
+      active_double_click_modifier_flags_ |= modifier_flag;
+      (void)double_click_modifier_detector_.HandleModifierFlagsChanged(active_double_click_modifier_flags_);
+    }
+    return;
+  }
+
+  double_click_modifier_detector_.HandleKeyDown();
+}
+
+void Win32App::HandleGlobalKeyUp(DWORD virtual_key) {
+  const std::uint32_t modifier_flag = ModifierFlagsForVirtualKey(virtual_key);
+  if (modifier_flag == 0) {
+    return;
+  }
+
+  active_double_click_modifier_flags_ &= ~modifier_flag;
+  const auto detected_key =
+      double_click_modifier_detector_.HandleModifierFlagsChanged(active_double_click_modifier_flags_);
+  if (!detected_key.has_value() ||
+      *detected_key != settings_.double_click_modifier_key ||
+      controller_window_ == nullptr ||
+      OpenTriggerConfigurationForSettings(settings_) != PopupOpenTriggerConfiguration::kDoubleClick) {
+    return;
+  }
+
+  PostMessageW(controller_window_, kDoubleClickModifierTriggeredMessage, 0, 0);
+}
+
+void Win32App::HandleDoubleClickModifierTriggered() {
+  if (OpenTriggerConfigurationForSettings(settings_) == PopupOpenTriggerConfiguration::kDoubleClick) {
+    TogglePopup();
+  }
+}
+
 void Win32App::HandleClipboardUpdate() {
   if (ignore_next_clipboard_update_) {
     ignore_next_clipboard_update_ = false;
@@ -2209,6 +2427,9 @@ LRESULT Win32App::HandleControllerMessage(HWND window, UINT message, WPARAM wpar
   switch (message) {
     case kActivateExistingInstanceMessage:
       ShowPopup();
+      return 0;
+    case kDoubleClickModifierTriggeredMessage:
+      HandleDoubleClickModifierTriggered();
       return 0;
     case WM_HOTKEY:
       if (static_cast<int>(wparam) == kToggleHotKeyId) {
@@ -2783,7 +3004,7 @@ LRESULT Win32App::HandleSettingsWindowMessage(HWND window, UINT message, WPARAM 
       const int page_padding = 12;
       const int content_width = page_width - page_padding * 2;
 
-      create_group(settings_general_page_, page_padding, 12, content_width, 118, UiText(zh, L"Open", L"打开方式"));
+      create_group(settings_general_page_, page_padding, 12, content_width, 194, UiText(zh, L"Open", L"打开方式"));
       create_label(
           settings_general_page_,
           page_padding + 16,
@@ -2803,9 +3024,34 @@ LRESULT Win32App::HandleSettingsWindowMessage(HWND window, UINT message, WPARAM 
           content_width - 32,
           18,
           UiText(zh, L"The previous hotkey is restored automatically if the new one can't be registered.", L"如果新的快捷键无法注册，程序会自动恢复之前的快捷键。"));
+      create_checkbox(
+          settings_general_page_,
+          settings_double_click_open_check_,
+          page_padding + 16,
+          116,
+          content_width - 32,
+          UiText(zh, L"Enable double-click modifier key to open", L"启用双击修饰键打开"));
+      create_label(
+          settings_general_page_,
+          page_padding + 16,
+          144,
+          110,
+          18,
+          UiText(zh, L"Modifier key", L"修饰键"));
+      create_combo(settings_general_page_, settings_double_click_modifier_combo_, page_padding + 132, 140, 180);
+      create_label(
+          settings_general_page_,
+          page_padding + 16,
+          172,
+          content_width - 32,
+          36,
+          UiText(
+              zh,
+              L"When enabled with a selected modifier, double-press that modifier to toggle clipboard history. Otherwise the regular hotkey remains active.",
+              L"启用后，若已选择修饰键，连按两次该修饰键即可切换剪贴板历史弹窗；未选择时仍使用普通快捷键。"));
 
-      create_group(settings_general_page_, page_padding, 142, content_width, 172, UiText(zh, L"Behavior", L"行为"));
-      int general_y = 166;
+      create_group(settings_general_page_, page_padding, 218, content_width, 172, UiText(zh, L"Behavior", L"行为"));
+      int general_y = 242;
       create_checkbox(
           settings_general_page_,
           settings_capture_enabled_check_,
@@ -2846,13 +3092,13 @@ LRESULT Win32App::HandleSettingsWindowMessage(HWND window, UINT message, WPARAM 
           content_width - 32,
           UiText(zh, L"Show startup guide", L"显示启动引导"));
 
-      create_group(settings_general_page_, page_padding, 326, content_width, 90, UiText(zh, L"Search", L"搜索"));
-      create_label(settings_general_page_, page_padding + 16, 352, 110, 18, UiText(zh, L"Search mode", L"搜索模式"));
-      create_combo(settings_general_page_, settings_search_mode_combo_, page_padding + 132, 348, 180);
+      create_group(settings_general_page_, page_padding, 402, content_width, 90, UiText(zh, L"Search", L"搜索"));
+      create_label(settings_general_page_, page_padding + 16, 428, 110, 18, UiText(zh, L"Search mode", L"搜索模式"));
+      create_combo(settings_general_page_, settings_search_mode_combo_, page_padding + 132, 424, 180);
       create_label(
           settings_general_page_,
           page_padding + 16,
-          380,
+          456,
           content_width - 32,
           18,
           UiText(zh, L"Matches the source project's exact, fuzzy, regexp, and mixed search modes.", L"对应源项目中的精确、模糊、正则和混合搜索模式。"));
@@ -3063,6 +3309,10 @@ LRESULT Win32App::HandleSettingsWindowMessage(HWND window, UINT message, WPARAM 
       for (const auto& choice : kPopupHotKeyChoices) {
         AddComboItem(settings_hotkey_key_combo_, PopupHotKeyLabel(zh, choice.virtual_key));
       }
+      AddComboItem(settings_double_click_modifier_combo_, DoubleClickModifierLabel(zh, DoubleClickModifierKey::kNone));
+      AddComboItem(settings_double_click_modifier_combo_, DoubleClickModifierLabel(zh, DoubleClickModifierKey::kAlt));
+      AddComboItem(settings_double_click_modifier_combo_, DoubleClickModifierLabel(zh, DoubleClickModifierKey::kShift));
+      AddComboItem(settings_double_click_modifier_combo_, DoubleClickModifierLabel(zh, DoubleClickModifierKey::kControl));
       AddComboItem(settings_search_mode_combo_, SearchModeLabel(zh, SearchMode::kMixed));
       AddComboItem(settings_search_mode_combo_, SearchModeLabel(zh, SearchMode::kExact));
       AddComboItem(settings_search_mode_combo_, SearchModeLabel(zh, SearchMode::kFuzzy));
@@ -3136,6 +3386,14 @@ LRESULT Win32App::HandleSettingsWindowMessage(HWND window, UINT message, WPARAM 
       break;
     }
     case WM_COMMAND:
+      if (reinterpret_cast<HWND>(lparam) == settings_double_click_open_check_ && HIWORD(wparam) == BN_CLICKED) {
+        if (settings_double_click_modifier_combo_ != nullptr) {
+          EnableWindow(
+              settings_double_click_modifier_combo_,
+              IsCheckboxChecked(settings_double_click_open_check_) ? TRUE : FALSE);
+        }
+        return 0;
+      }
       switch (LOWORD(wparam)) {
         case kSettingsSaveButtonId:
           if (ApplySettingsWindowChanges()) {
@@ -3170,6 +3428,8 @@ LRESULT Win32App::HandleSettingsWindowMessage(HWND window, UINT message, WPARAM 
       settings_auto_paste_check_ = nullptr;
       settings_plain_text_check_ = nullptr;
       settings_start_on_login_check_ = nullptr;
+      settings_double_click_open_check_ = nullptr;
+      settings_double_click_modifier_combo_ = nullptr;
       settings_hotkey_ctrl_check_ = nullptr;
       settings_hotkey_alt_check_ = nullptr;
       settings_hotkey_shift_check_ = nullptr;
@@ -3274,6 +3534,25 @@ LRESULT CALLBACK Win32App::StaticSettingsWindowProc(HWND window, UINT message, W
   }
 
   return DefWindowProcW(window, message, wparam, lparam);
+}
+
+LRESULT CALLBACK Win32App::StaticLowLevelKeyboardProc(int code, WPARAM wparam, LPARAM lparam) {
+  if (code < 0 || g_keyboard_hook_target == nullptr || lparam == 0) {
+    return CallNextHookEx(nullptr, code, wparam, lparam);
+  }
+
+  const auto* keyboard_event = reinterpret_cast<const KBDLLHOOKSTRUCT*>(lparam);
+  if ((keyboard_event->flags & LLKHF_INJECTED) != 0) {
+    return CallNextHookEx(nullptr, code, wparam, lparam);
+  }
+
+  if (IsKeyboardKeyDownMessage(wparam)) {
+    g_keyboard_hook_target->HandleGlobalKeyDown(keyboard_event->vkCode);
+  } else if (IsKeyboardKeyUpMessage(wparam)) {
+    g_keyboard_hook_target->HandleGlobalKeyUp(keyboard_event->vkCode);
+  }
+
+  return CallNextHookEx(nullptr, code, wparam, lparam);
 }
 
 Win32App* Win32App::FromWindowUserData(HWND window) {

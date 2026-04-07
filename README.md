@@ -66,6 +66,7 @@ Available settings today:
 
 - `General`
   - configurable global open hotkey
+  - optional double-click modifier key open trigger
   - enable clipboard capture
   - auto paste
   - paste plain text

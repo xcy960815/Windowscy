@@ -15,6 +15,8 @@ int main() {
   original.search_mode = maccy::SearchMode::kRegexp;
   original.popup_hotkey_modifiers = 0x0003;
   original.popup_hotkey_virtual_key = 0x77;
+  original.double_click_popup_enabled = true;
+  original.double_click_modifier_key = maccy::DoubleClickModifierKey::kShift;
   original.show_startup_guide = false;
   original.capture_enabled = false;
   original.auto_paste = false;
@@ -53,6 +55,8 @@ int main() {
   assert(loaded.search_mode == original.search_mode);
   assert(loaded.popup_hotkey_modifiers == original.popup_hotkey_modifiers);
   assert(loaded.popup_hotkey_virtual_key == original.popup_hotkey_virtual_key);
+  assert(loaded.double_click_popup_enabled == original.double_click_popup_enabled);
+  assert(loaded.double_click_modifier_key == original.double_click_modifier_key);
   assert(loaded.show_startup_guide == original.show_startup_guide);
   assert(loaded.capture_enabled == original.capture_enabled);
   assert(loaded.auto_paste == original.auto_paste);

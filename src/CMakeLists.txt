@@ -1,4 +1,5 @@
 add_library(maccy_core STATIC
+  core/double_click_modifier.cpp
   core/history_item.cpp
   core/ignore_rules.cpp
   core/history_persistence.cpp

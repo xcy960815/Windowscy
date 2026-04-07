@@ -8,6 +8,7 @@
 #include <string>
 #include <vector>
 
+#include "core/double_click_modifier.h"
 #include "core/history_store.h"
 #include "core/settings.h"
 
@@ -68,10 +69,13 @@ class Win32App {
   bool RegisterWindowClasses();
   bool CreateControllerWindow();
   bool CreatePopupWindow();
+  bool RefreshOpenTriggerRegistration();
   bool RegisterToggleHotKey();
+  bool StartDoubleClickMonitor();
   bool SetupTrayIcon();
   void RemoveTrayIcon();
   void UnregisterToggleHotKey();
+  void StopDoubleClickMonitor();
   void ShowTrayMenu(const POINT* anchor = nullptr);
   void OpenSettingsWindow();
   void CloseSettingsWindow();
@@ -107,6 +111,9 @@ class Win32App {
   void ClosePinEditor();
   void LayoutPinEditorControls();
   void ActivateSelectedItem();
+  void HandleGlobalKeyDown(DWORD virtual_key);
+  void HandleGlobalKeyUp(DWORD virtual_key);
+  void HandleDoubleClickModifierTriggered();
   void HandleClipboardUpdate();
   void ExitApplication();
   std::filesystem::path ResolveHistoryPath() const;
@@ -125,6 +132,7 @@ class Win32App {
   static LRESULT CALLBACK StaticSearchEditProc(HWND window, UINT message, WPARAM wparam, LPARAM lparam);
   static LRESULT CALLBACK StaticPinEditorWindowProc(HWND window, UINT message, WPARAM wparam, LPARAM lparam);
   static LRESULT CALLBACK StaticSettingsWindowProc(HWND window, UINT message, WPARAM wparam, LPARAM lparam);
+  static LRESULT CALLBACK StaticLowLevelKeyboardProc(int code, WPARAM wparam, LPARAM lparam);
 
   static Win32App* FromWindowUserData(HWND window);
 
@@ -148,6 +156,8 @@ class Win32App {
   HWND settings_auto_paste_check_ = nullptr;
   HWND settings_plain_text_check_ = nullptr;
   HWND settings_start_on_login_check_ = nullptr;
+  HWND settings_double_click_open_check_ = nullptr;
+  HWND settings_double_click_modifier_combo_ = nullptr;
   HWND settings_hotkey_ctrl_check_ = nullptr;
   HWND settings_hotkey_alt_check_ = nullptr;
   HWND settings_hotkey_shift_check_ = nullptr;
@@ -177,11 +187,13 @@ class Win32App {
   HANDLE single_instance_mutex_ = nullptr;
   WNDPROC original_search_edit_proc_ = nullptr;
   WNDPROC original_list_box_proc_ = nullptr;
+  HHOOK double_click_hook_ = nullptr;
   UINT taskbar_created_message_ = 0;
   bool toggle_hotkey_registered_ = false;
   bool ignore_next_clipboard_update_ = false;
   bool capture_enabled_ = true;
   bool ignore_next_external_copy_ = false;
+  std::uint32_t active_double_click_modifier_flags_ = 0;
   HWND previous_foreground_window_ = nullptr;
   std::string search_query_;
   std::vector<std::uint64_t> visible_item_ids_;
@@ -189,6 +201,7 @@ class Win32App {
   std::filesystem::path settings_path_;
   AppSettings settings_;
   HistoryStore store_;
+  DoubleClickModifierKeyDetector double_click_modifier_detector_;
   std::uint64_t pin_editor_item_id_ = 0;
   bool pin_editor_rename_only_ = false;
   bool use_chinese_ui_ = false;

@@ -6,6 +6,7 @@
 #include <string>
 #include <vector>
 
+#include "core/double_click_modifier.h"
 #include "core/history_store.h"
 #include "core/search.h"
 
@@ -44,6 +45,8 @@ struct AppSettings {
   SearchMode search_mode = SearchMode::kMixed;
   std::uint32_t popup_hotkey_modifiers = 0x0006;
   std::uint32_t popup_hotkey_virtual_key = 'C';
+  bool double_click_popup_enabled = false;
+  DoubleClickModifierKey double_click_modifier_key = DoubleClickModifierKey::kNone;
   bool show_startup_guide = true;
   bool capture_enabled = true;
   bool auto_paste = true;

@@ -14,6 +14,14 @@ target_link_libraries(maccy_history_store_test PRIVATE maccy_core)
 
 add_test(NAME maccy_history_store_test COMMAND maccy_history_store_test)
 
+add_executable(maccy_double_click_modifier_test
+  double_click_modifier_test.cpp
+)
+
+target_link_libraries(maccy_double_click_modifier_test PRIVATE maccy_core)
+
+add_test(NAME maccy_double_click_modifier_test COMMAND maccy_double_click_modifier_test)
+
 add_executable(maccy_search_modes_test
   search_modes_test.cpp
 )
