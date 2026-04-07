@@ -1,3 +1,8 @@
+/**
+ * @file win32_app.cpp
+ * @brief Windows 应用程序主类实现
+ */
+
 #ifdef _WIN32
 
 #include "app/win32_app.h"
@@ -32,35 +37,60 @@ namespace maccy {
 
 namespace {
 
+/** 控制器窗口类名称 */
 constexpr wchar_t kControllerWindowClass[] = L"MaccyWindowsController";
+/** 弹窗窗口类名称 */
 constexpr wchar_t kPopupWindowClass[] = L"MaccyWindowsPopup";
+/** 固定编辑器窗口类名称 */
 constexpr wchar_t kPinEditorWindowClass[] = L"MaccyWindowsPinEditor";
+/** 设置窗口类名称 */
 constexpr wchar_t kSettingsWindowClass[] = L"MaccyWindowsSettings";
+/** 窗口标题 */
 constexpr wchar_t kWindowTitle[] = L"Maccy Windows";
+/** 单实例互斥体名称 */
 constexpr wchar_t kSingleInstanceMutexName[] = L"Local\\MaccyWindowsSingleInstance";
+/** 激活已存在实例的消息 */
 constexpr UINT kActivateExistingInstanceMessage = WM_APP + 2;
+/** 双击修饰符触发消息 */
 constexpr UINT kDoubleClickModifierTriggeredMessage = WM_APP + 3;
+/** 设置窗口客户区宽度 */
 constexpr int kSettingsClientWidth = 920;
+/** 设置窗口客户区高度 */
 constexpr int kSettingsClientHeight = 690;
+/** 设置标签控件 ID */
 constexpr int kSettingsTabControlId = 2100;
+/** 设置保存按钮 ID */
 constexpr int kSettingsSaveButtonId = 2101;
+/** 设置应用按钮 ID */
 constexpr int kSettingsApplyButtonId = 2102;
+/** 设置关闭按钮 ID */
 constexpr int kSettingsCloseButtonId = 2103;
+/** 热键修饰符：Alt */
 constexpr std::uint32_t kHotKeyModAlt = 0x0001;
+/** 热键修饰符：Control */
 constexpr std::uint32_t kHotKeyModControl = 0x0002;
+/** 热键修饰符：Shift */
 constexpr std::uint32_t kHotKeyModShift = 0x0004;
+/** 热键修饰符：Win */
 constexpr std::uint32_t kHotKeyModWin = 0x0008;
 
+/**
+ * @brief 弹窗打开触发器配置枚举
+ */
 enum class PopupOpenTriggerConfiguration {
-  kRegularShortcut,
-  kDoubleClick,
+  kRegularShortcut,  /**< 常规快捷键 */
+  kDoubleClick,      /**< 双击修饰符 */
 };
 
+/**
+ * @brief 热键选择结构体
+ */
 struct HotKeyChoice {
-  std::uint32_t virtual_key = 0;
-  const wchar_t* label = L"";
+  std::uint32_t virtual_key = 0;  /**< 虚拟键码 */
+  const wchar_t* label = L"";    /**< 显示标签 */
 };
 
+/** 弹窗热键可选键列表 */
 constexpr HotKeyChoice kPopupHotKeyChoices[] = {
     {'A', L"A"},   {'B', L"B"},   {'C', L"C"},   {'D', L"D"},   {'E', L"E"},   {'F', L"F"},
     {'G', L"G"},   {'H', L"H"},   {'I', L"I"},   {'J', L"J"},   {'K', L"K"},   {'L', L"L"},
@@ -74,8 +104,14 @@ constexpr HotKeyChoice kPopupHotKeyChoices[] = {
     {VK_SPACE, L"Space"},
 };
 
+/** 键盘钩子目标实例指针 */
 Win32App* g_keyboard_hook_target = nullptr;
 
+/**
+ * @brief 根据设置获取弹窗打开触发器配置
+ * @param settings 应用程序设置
+ * @return PopupOpenTriggerConfiguration 触发器配置
+ */
 PopupOpenTriggerConfiguration OpenTriggerConfigurationForSettings(const AppSettings& settings) {
   if (settings.double_click_popup_enabled && settings.double_click_modifier_key != DoubleClickModifierKey::kNone) {
     return PopupOpenTriggerConfiguration::kDoubleClick;
@@ -84,13 +120,32 @@ PopupOpenTriggerConfiguration OpenTriggerConfigurationForSettings(const AppSetti
   return PopupOpenTriggerConfiguration::kRegularShortcut;
 }
 
+/**
+ * @brief 获取组合框当前选中索引
+ * @param combo 组合框句柄
+ * @param fallback_index 备用索引
+ * @return int 当前选中索引或备用索引
+ */
 int GetComboSelection(HWND combo, int fallback_index);
 
+/**
+ * @brief 显示对话框
+ * @param owner 所有者窗口
+ * @param message 消息文本
+ * @param flags 消息框标志
+ */
 void ShowDialog(HWND owner, std::wstring_view message, UINT flags) {
   const std::wstring text(message);
   MessageBoxW(owner, text.c_str(), kWindowTitle, MB_OK | flags);
 }
 
+/**
+ * @brief 加载指定大小的应用图标
+ * @param instance 应用程序实例
+ * @param width 图标宽度
+ * @param height 图标高度
+ * @return HICON 加载的图标句柄
+ */
 HICON LoadSizedAppIcon(HINSTANCE instance, int width, int height) {
   if (instance != nullptr) {
     const auto icon = static_cast<HICON>(LoadImageW(
@@ -114,14 +169,29 @@ HICON LoadSizedAppIcon(HINSTANCE instance, int width, int height) {
       LR_DEFAULTCOLOR | LR_SHARED));
 }
 
+/**
+ * @brief 加载大尺寸应用图标
+ * @param instance 应用程序实例
+ * @return HICON 大图标句柄
+ */
 HICON LoadLargeAppIcon(HINSTANCE instance) {
   return LoadSizedAppIcon(instance, GetSystemMetrics(SM_CXICON), GetSystemMetrics(SM_CYICON));
 }
 
+/**
+ * @brief 加载小尺寸应用图标
+ * @param instance 应用程序实例
+ * @return HICON 小图标句柄
+ */
 HICON LoadSmallAppIcon(HINSTANCE instance) {
   return LoadSizedAppIcon(instance, GetSystemMetrics(SM_CXSMICON), GetSystemMetrics(SM_CYSMICON));
 }
 
+/**
+ * @brief 获取指定点所在显示器的工作区域
+ * @param point 屏幕坐标点
+ * @return RECT 工作区域矩形
+ */
 RECT MonitorWorkAreaForPoint(POINT point) {
   RECT work_area{0, 0, 1280, 720};
 
@@ -135,10 +205,18 @@ RECT MonitorWorkAreaForPoint(POINT point) {
   return work_area;
 }
 
+/**
+ * @brief 获取弹窗窗口样式
+ * @return DWORD 窗口样式
+ */
 DWORD PopupWindowStyle() {
   return WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU | WS_SIZEBOX;
 }
 
+/**
+ * @brief 解析应用数据目录路径
+ * @return std::filesystem::path 应用数据目录路径
+ */
 std::filesystem::path ResolveAppDataDirectory() {
   wchar_t* local_app_data = nullptr;
   std::size_t length = 0;
@@ -157,16 +235,33 @@ std::filesystem::path ResolveAppDataDirectory() {
   return std::filesystem::current_path() / "MaccyWindows";
 }
 
+/**
+ * @brief 检查是否应使用中文界面
+ * @return bool 是否使用中文界面
+ */
 bool ShouldUseChineseUi() {
   return PRIMARYLANGID(GetUserDefaultUILanguage()) == LANG_CHINESE;
 }
 
+/**
+ * @brief 根据语言设置返回对应的文本
+ * @param use_chinese_ui 是否使用中文
+ * @param english 英文文本
+ * @param chinese 中文文本
+ * @return const wchar_t* 对应语言的文本
+ */
 const wchar_t* UiText(bool use_chinese_ui, const wchar_t* english, const wchar_t* chinese) {
   return use_chinese_ui ? chinese : english;
 }
 
 std::uint32_t ModifierFlagsForVirtualKey(DWORD virtual_key);
 
+/**
+ * @brief 获取双击修饰符键的显示标签
+ * @param use_chinese_ui 是否使用中文
+ * @param key 双击修饰符键
+ * @return const wchar_t* 显示标签
+ */
 const wchar_t* DoubleClickModifierLabel(bool use_chinese_ui, DoubleClickModifierKey key) {
   switch (key) {
     case DoubleClickModifierKey::kAlt:
@@ -181,10 +276,22 @@ const wchar_t* DoubleClickModifierLabel(bool use_chinese_ui, DoubleClickModifier
   }
 }
 
+/**
+ * @brief 从虚拟键码获取双击修饰符键
+ * @param virtual_key 虚拟键码
+ * @return DoubleClickModifierKey 双击修饰符键
+ */
 DoubleClickModifierKey DoubleClickModifierKeyFromVirtualKey(DWORD virtual_key) {
   return StandaloneDoubleClickModifierKey(ModifierFlagsForVirtualKey(virtual_key));
 }
 
+/**
+ * @brief 获取双击修饰符录制器文本
+ * @param use_chinese_ui 是否使用中文
+ * @param key 当前修饰符键
+ * @param recorder_enabled 录制器是否启用
+ * @return std::wstring 录制器文本
+ */
 std::wstring DoubleClickModifierRecorderText(
     bool use_chinese_ui,
     DoubleClickModifierKey key,
@@ -203,6 +310,13 @@ std::wstring DoubleClickModifierRecorderText(
   return DoubleClickModifierLabel(use_chinese_ui, DoubleClickModifierKey::kNone);
 }
 
+/**
+ * @brief 构建托盘提示文本
+ * @param use_chinese_ui 是否使用中文
+ * @param capture_enabled 是否启用捕获
+ * @param store 历史记录存储
+ * @return std::wstring 托盘提示文本
+ */
 std::wstring BuildTrayTooltip(bool use_chinese_ui, bool capture_enabled, const HistoryStore& store) {
   std::wstring tooltip = L"Maccy Windows";
   if (!capture_enabled) {
@@ -220,10 +334,20 @@ std::wstring BuildTrayTooltip(bool use_chinese_ui, bool capture_enabled, const H
   return tooltip;
 }
 
+/**
+ * @brief 从托盘消息参数获取通知码
+ * @param lparam 消息的 lparam
+ * @return UINT 通知码
+ */
 UINT TrayNotifyCode(LPARAM lparam) {
   return LOWORD(static_cast<DWORD>(lparam));
 }
 
+/**
+ * @brief 从托盘消息参数获取锚点坐标
+ * @param wparam 消息的 wparam
+ * @return POINT 锚点坐标
+ */
 POINT TrayAnchorPoint(WPARAM wparam) {
   const DWORD coordinates = static_cast<DWORD>(wparam);
   POINT point{};
@@ -232,6 +356,11 @@ POINT TrayAnchorPoint(WPARAM wparam) {
   return point;
 }
 
+/**
+ * @brief 获取虚拟键码对应的修饰符标志
+ * @param virtual_key 虚拟键码
+ * @return std::uint32_t 修饰符标志
+ */
 std::uint32_t ModifierFlagsForVirtualKey(DWORD virtual_key) {
   switch (virtual_key) {
     case VK_LMENU:
@@ -254,14 +383,30 @@ std::uint32_t ModifierFlagsForVirtualKey(DWORD virtual_key) {
   }
 }
 
+/**
+ * @brief 检查是否为键盘按键按下消息
+ * @param message 消息类型
+ * @return bool 是否为按键按下消息
+ */
 bool IsKeyboardKeyDownMessage(WPARAM message) {
   return message == WM_KEYDOWN || message == WM_SYSKEYDOWN;
 }
 
+/**
+ * @brief 检查是否为键盘按键释放消息
+ * @param message 消息类型
+ * @return bool 是否为按键释放消息
+ */
 bool IsKeyboardKeyUpMessage(WPARAM message) {
   return message == WM_KEYUP || message == WM_SYSKEYUP;
 }
 
+/**
+ * @brief 获取弹窗热键标签
+ * @param use_chinese_ui 是否使用中文
+ * @param virtual_key 虚拟键码
+ * @return const wchar_t* 热键标签
+ */
 const wchar_t* PopupHotKeyLabel(bool use_chinese_ui, std::uint32_t virtual_key) {
   for (const auto& choice : kPopupHotKeyChoices) {
     if (choice.virtual_key == virtual_key) {
@@ -275,6 +420,12 @@ const wchar_t* PopupHotKeyLabel(bool use_chinese_ui, std::uint32_t virtual_key) 
   return UiText(use_chinese_ui, L"Unknown", L"未知");
 }
 
+/**
+ * @brief 获取搜索模式标签
+ * @param use_chinese_ui 是否使用中文
+ * @param mode 搜索模式
+ * @return const wchar_t* 搜索模式标签
+ */
 const wchar_t* SearchModeLabel(bool use_chinese_ui, SearchMode mode) {
   switch (mode) {
     case SearchMode::kMixed:
@@ -290,6 +441,12 @@ const wchar_t* SearchModeLabel(bool use_chinese_ui, SearchMode mode) {
   return UiText(use_chinese_ui, L"Mixed", L"混合");
 }
 
+/**
+ * @brief 获取排序方式标签
+ * @param use_chinese_ui 是否使用中文
+ * @param order 排序方式
+ * @return const wchar_t* 排序方式标签
+ */
 const wchar_t* SortOrderLabel(bool use_chinese_ui, HistorySortOrder order) {
   switch (order) {
     case HistorySortOrder::kLastCopied:
@@ -303,6 +460,12 @@ const wchar_t* SortOrderLabel(bool use_chinese_ui, HistorySortOrder order) {
   return UiText(use_chinese_ui, L"Last Copied", L"最近复制");
 }
 
+/**
+ * @brief 获取置顶位置标签
+ * @param use_chinese_ui 是否使用中文
+ * @param position 置顶位置
+ * @return const wchar_t* 置顶位置标签
+ */
 const wchar_t* PinPositionLabel(bool use_chinese_ui, PinPosition position) {
   switch (position) {
     case PinPosition::kTop:
@@ -314,6 +477,12 @@ const wchar_t* PinPositionLabel(bool use_chinese_ui, PinPosition position) {
   return UiText(use_chinese_ui, L"Pins on Top", L"置顶项在上");
 }
 
+/**
+ * @brief 获取本地化的内容格式名称
+ * @param use_chinese_ui 是否使用中文
+ * @param format 内容格式
+ * @return const wchar_t* 本地化的格式名称
+ */
 const wchar_t* LocalizedContentFormatName(bool use_chinese_ui, ContentFormat format) {
   switch (format) {
     case ContentFormat::kPlainText:
@@ -333,6 +502,12 @@ const wchar_t* LocalizedContentFormatName(bool use_chinese_ui, ContentFormat for
   return UiText(use_chinese_ui, L"Custom", L"自定义");
 }
 
+/**
+ * @brief 连接内容格式列表
+ * @param use_chinese_ui 是否使用中文
+ * @param item 历史记录项
+ * @return std::wstring 格式列表字符串
+ */
 std::wstring JoinContentFormats(bool use_chinese_ui, const HistoryItem& item) {
   std::wstring joined;
 
@@ -351,6 +526,12 @@ std::wstring JoinContentFormats(bool use_chinese_ui, const HistoryItem& item) {
   return joined;
 }
 
+/**
+ * @brief 构建预览正文
+ * @param use_chinese_ui 是否使用中文
+ * @param item 历史记录项
+ * @return std::wstring 预览正文
+ */
 std::wstring BuildPreviewBody(bool use_chinese_ui, const HistoryItem& item) {
   if (const auto text = item.PreferredContentText(); !text.empty()) {
     return win32::Utf8ToWide(text);
@@ -367,6 +548,12 @@ std::wstring BuildPreviewBody(bool use_chinese_ui, const HistoryItem& item) {
   return win32::Utf8ToWide(item.PreferredDisplayText());
 }
 
+/**
+ * @brief 构建预览文本
+ * @param use_chinese_ui 是否使用中文
+ * @param item 历史记录项
+ * @return std::wstring 预览文本
+ */
 std::wstring BuildPreviewText(bool use_chinese_ui, const HistoryItem& item) {
   const std::wstring source_application = item.metadata.source_application.empty()
                                               ? std::wstring(UiText(use_chinese_ui, L"Unknown", L"未知"))
@@ -392,11 +579,20 @@ std::wstring BuildPreviewText(bool use_chinese_ui, const HistoryItem& item) {
   return preview.str();
 }
 
+/**
+ * @brief 宽字符高亮区间结构体
+ */
 struct WideHighlightSpan {
-  int start = 0;
-  int length = 0;
+  int start = 0;   /**< 起始位置 */
+  int length = 0; /**< 长度 */
 };
 
+/**
+ * @brief 将 UTF-8 高亮区间转换为宽字符区间
+ * @param utf8_text UTF-8 编码的文本
+ * @param spans UTF-8 高亮区间列表
+ * @return std::vector<WideHighlightSpan> 宽字符高亮区间列表
+ */
 std::vector<WideHighlightSpan> ToWideHighlightSpans(
     std::string_view utf8_text,
     const std::vector<HighlightSpan>& spans) {
@@ -420,6 +616,15 @@ std::vector<WideHighlightSpan> ToWideHighlightSpans(
   return wide_spans;
 }
 
+/**
+ * @brief 绘制文本段
+ * @param dc 设备上下文句柄
+ * @param x X 坐标
+ * @param y Y 坐标
+ * @param text 文本
+ * @param text_color 文本颜色
+ * @param background_color 背景颜色（可选）
+ */
 void DrawTextSegment(
     HDC dc,
     int x,
@@ -443,6 +648,12 @@ void DrawTextSegment(
   }
 }
 
+/**
+ * @brief 获取文本宽度
+ * @param dc 设备上下文句柄
+ * @param text 文本
+ * @return int 文本宽度
+ */
 int TextWidth(HDC dc, std::wstring_view text) {
   if (text.empty()) {
     return 0;
@@ -453,6 +664,11 @@ int TextWidth(HDC dc, std::wstring_view text) {
   return size.cx;
 }
 
+/**
+ * @brief 从菜单命令获取搜索模式
+ * @param command 菜单命令 ID
+ * @return SearchMode 搜索模式
+ */
 SearchMode SearchModeFromMenuCommand(UINT command) {
   switch (command) {
     case 1020:
@@ -467,6 +683,11 @@ SearchMode SearchModeFromMenuCommand(UINT command) {
   }
 }
 
+/**
+ * @brief 从菜单命令获取排序方式
+ * @param command 菜单命令 ID
+ * @return HistorySortOrder 排序方式
+ */
 HistorySortOrder SortOrderFromMenuCommand(UINT command) {
   switch (command) {
     case 1031:
@@ -479,10 +700,20 @@ HistorySortOrder SortOrderFromMenuCommand(UINT command) {
   }
 }
 
+/**
+ * @brief 从菜单命令获取置顶位置
+ * @param command 菜单命令 ID
+ * @return PinPosition 置顶位置
+ */
 PinPosition PinPositionFromMenuCommand(UINT command) {
   return command == 1041 ? PinPosition::kBottom : PinPosition::kTop;
 }
 
+/**
+ * @brief 从菜单命令获取历史记录限制
+ * @param command 菜单命令 ID
+ * @return std::size_t 历史记录限制数量
+ */
 std::size_t HistoryLimitFromMenuCommand(UINT command) {
   switch (command) {
     case 1050:
@@ -497,28 +728,54 @@ std::size_t HistoryLimitFromMenuCommand(UINT command) {
   }
 }
 
+/**
+ * @brief 设置复选框选中状态
+ * @param window 复选框窗口句柄
+ * @param checked 是否选中
+ */
 void SetCheckboxChecked(HWND window, bool checked) {
   if (window != nullptr) {
     SendMessageW(window, BM_SETCHECK, checked ? BST_CHECKED : BST_UNCHECKED, 0);
   }
 }
 
+/**
+ * @brief 检查复选框是否选中
+ * @param window 复选框窗口句柄
+ * @return bool 是否选中
+ */
 bool IsCheckboxChecked(HWND window) {
   return window != nullptr && SendMessageW(window, BM_GETCHECK, 0, 0) == BST_CHECKED;
 }
 
+/**
+ * @brief 添加组合框项
+ * @param combo 组合框窗口句柄
+ * @param text 要添加的文本
+ */
 void AddComboItem(HWND combo, const wchar_t* text) {
   if (combo != nullptr) {
     SendMessageW(combo, CB_ADDSTRING, 0, reinterpret_cast<LPARAM>(text));
   }
 }
 
+/**
+ * @brief 设置组合框选中项
+ * @param combo 组合框窗口句柄
+ * @param index 要选中的索引
+ */
 void SetComboSelection(HWND combo, int index) {
   if (combo != nullptr) {
     SendMessageW(combo, CB_SETCURSEL, static_cast<WPARAM>(index), 0);
   }
 }
 
+/**
+ * @brief 获取组合框当前选中索引
+ * @param combo 组合框窗口句柄
+ * @param fallback_index 备用索引
+ * @return int 当前选中索引或备用索引
+ */
 int GetComboSelection(HWND combo, int fallback_index) {
   if (combo == nullptr) {
     return fallback_index;
@@ -528,6 +785,11 @@ int GetComboSelection(HWND combo, int fallback_index) {
   return selection == CB_ERR ? fallback_index : static_cast<int>(selection);
 }
 
+/**
+ * @brief 获取搜索模式对应的组合框索引
+ * @param mode 搜索模式
+ * @return int 组合框索引
+ */
 int SearchModeComboIndex(SearchMode mode) {
   switch (mode) {
     case SearchMode::kExact:
@@ -542,6 +804,11 @@ int SearchModeComboIndex(SearchMode mode) {
   }
 }
 
+/**
+ * @brief 从组合框选择获取搜索模式
+ * @param combo 组合框窗口句柄
+ * @return SearchMode 搜索模式
+ */
 SearchMode SearchModeFromComboSelection(HWND combo) {
   switch (GetComboSelection(combo, 0)) {
     case 1:
@@ -556,6 +823,11 @@ SearchMode SearchModeFromComboSelection(HWND combo) {
   }
 }
 
+/**
+ * @brief 获取排序方式对应的组合框索引
+ * @param order 排序方式
+ * @return int 组合框索引
+ */
 int SortOrderComboIndex(HistorySortOrder order) {
   switch (order) {
     case HistorySortOrder::kFirstCopied:
@@ -568,6 +840,11 @@ int SortOrderComboIndex(HistorySortOrder order) {
   }
 }
 
+/**
+ * @brief 从组合框选择获取排序方式
+ * @param combo 组合框窗口句柄
+ * @return HistorySortOrder 排序方式
+ */
 HistorySortOrder SortOrderFromComboSelection(HWND combo) {
   switch (GetComboSelection(combo, 0)) {
     case 1:
@@ -580,14 +857,29 @@ HistorySortOrder SortOrderFromComboSelection(HWND combo) {
   }
 }
 
+/**
+ * @brief 获取置顶位置对应的组合框索引
+ * @param position 置顶位置
+ * @return int 组合框索引
+ */
 int PinPositionComboIndex(PinPosition position) {
   return position == PinPosition::kBottom ? 1 : 0;
 }
 
+/**
+ * @brief 从组合框选择获取置顶位置
+ * @param combo 组合框窗口句柄
+ * @return PinPosition 置顶位置
+ */
 PinPosition PinPositionFromComboSelection(HWND combo) {
   return GetComboSelection(combo, 0) == 1 ? PinPosition::kBottom : PinPosition::kTop;
 }
 
+/**
+ * @brief 获取历史限制对应的组合框索引
+ * @param limit 历史限制数量
+ * @return int 组合框索引
+ */
 int HistoryLimitComboIndex(std::size_t limit) {
   switch (limit) {
     case 50:
@@ -602,6 +894,11 @@ int HistoryLimitComboIndex(std::size_t limit) {
   }
 }
 
+/**
+ * @brief 从组合框选择获取历史限制
+ * @param combo 组合框窗口句柄
+ * @return std::size_t 历史限制数量
+ */
 std::size_t HistoryLimitFromComboSelection(HWND combo) {
   switch (GetComboSelection(combo, 2)) {
     case 0:
@@ -616,6 +913,11 @@ std::size_t HistoryLimitFromComboSelection(HWND combo) {
   }
 }
 
+/**
+ * @brief 连接多行文本
+ * @param lines 文本行列表
+ * @return std::wstring 连接后的多行文本
+ */
 std::wstring JoinMultilineText(const std::vector<std::string>& lines) {
   std::wstring joined;
 
@@ -629,6 +931,11 @@ std::wstring JoinMultilineText(const std::vector<std::string>& lines) {
   return joined;
 }
 
+/**
+ * @brief 分割多行文本
+ * @param text 多行文本
+ * @return std::vector<std::string> 分割后的文本行列表
+ */
 std::vector<std::string> SplitMultilineText(const std::wstring& text) {
   std::vector<std::string> lines;
   std::wstring current;
@@ -656,6 +963,11 @@ std::vector<std::string> SplitMultilineText(const std::wstring& text) {
   return lines;
 }
 
+/**
+ * @brief 获取弹窗热键对应的组合框索引
+ * @param virtual_key 虚拟键码
+ * @return int 组合框索引
+ */
 int PopupHotKeyComboIndex(std::uint32_t virtual_key) {
   for (int index = 0; index < static_cast<int>(sizeof(kPopupHotKeyChoices) / sizeof(kPopupHotKeyChoices[0])); ++index) {
     if (kPopupHotKeyChoices[index].virtual_key == virtual_key) {
@@ -666,6 +978,11 @@ int PopupHotKeyComboIndex(std::uint32_t virtual_key) {
   return 2;
 }
 
+/**
+ * @brief 从组合框选择获取弹窗热键虚拟键码
+ * @param combo 组合框窗口句柄
+ * @return std::uint32_t 虚拟键码
+ */
 std::uint32_t PopupHotKeyVirtualKeyFromComboSelection(HWND combo) {
   const int index = GetComboSelection(combo, 2);
   if (index < 0 || index >= static_cast<int>(sizeof(kPopupHotKeyChoices) / sizeof(kPopupHotKeyChoices[0]))) {
@@ -675,10 +992,23 @@ std::uint32_t PopupHotKeyVirtualKeyFromComboSelection(HWND combo) {
   return kPopupHotKeyChoices[index].virtual_key;
 }
 
+/**
+ * @brief 检查弹窗热键是否有效
+ * @param modifiers 修饰符
+ * @param virtual_key 虚拟键码
+ * @return bool 热键是否有效
+ */
 bool IsValidPopupHotKey(std::uint32_t modifiers, std::uint32_t virtual_key) {
   return virtual_key != 0 && (modifiers & 0x000F) != 0;
 }
 
+/**
+ * @brief 格式化弹窗热键文本
+ * @param use_chinese_ui 是否使用中文
+ * @param modifiers 修饰符
+ * @param virtual_key 虚拟键码
+ * @return std::wstring 格式化的热键文本
+ */
 std::wstring FormatPopupHotKey(bool use_chinese_ui, std::uint32_t modifiers, std::uint32_t virtual_key) {
   std::wstring text;
 
@@ -699,6 +1029,12 @@ std::wstring FormatPopupHotKey(bool use_chinese_ui, std::uint32_t modifiers, std
   return text;
 }
 
+/**
+ * @brief 描述打开触发器
+ * @param use_chinese_ui 是否使用中文
+ * @param settings 应用程序设置
+ * @return std::wstring 触发器描述
+ */
 std::wstring DescribeOpenTrigger(bool use_chinese_ui, const AppSettings& settings) {
   if (OpenTriggerConfigurationForSettings(settings) == PopupOpenTriggerConfiguration::kDoubleClick) {
     return std::wstring(UiText(use_chinese_ui, L"double-click ", L"双击 ")) +
@@ -708,6 +1044,11 @@ std::wstring DescribeOpenTrigger(bool use_chinese_ui, const AppSettings& setting
   return FormatPopupHotKey(use_chinese_ui, settings.popup_hotkey_modifiers, settings.popup_hotkey_virtual_key);
 }
 
+/**
+ * @brief 读取窗口文本
+ * @param window 窗口句柄
+ * @return std::wstring 窗口文本
+ */
 std::wstring ReadWindowText(HWND window) {
   if (window == nullptr) {
     return {};
@@ -725,6 +1066,10 @@ std::wstring ReadWindowText(HWND window) {
   return text;
 }
 
+/**
+ * @brief 通知已存在的实例激活
+ * @return bool 是否成功通知
+ */
 bool NotifyExistingInstance() {
   for (int attempt = 0; attempt < 20; ++attempt) {
     const HWND existing_window = FindWindowW(kControllerWindowClass, nullptr);
@@ -739,6 +1084,9 @@ bool NotifyExistingInstance() {
   return false;
 }
 
+/**
+ * @brief 关闭旧版本实例
+ */
 void CloseLegacyInstances() {
   HWND existing_window = nullptr;
   while ((existing_window = FindWindowExW(nullptr, existing_window, kControllerWindowClass, nullptr)) != nullptr) {
