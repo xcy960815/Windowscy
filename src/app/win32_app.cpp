@@ -3514,8 +3514,15 @@ LRESULT Win32App::HandleSettingsWindowMessage(HWND window, UINT message, WPARAM 
 
 LRESULT Win32App::HandleSettingsDoubleClickModifierMessage(HWND window, UINT message, WPARAM wparam, LPARAM lparam) {
   switch (message) {
-    case WM_GETDLGCODE:
-      break;
+    case WM_GETDLGCODE: {
+      const LRESULT dialog_code = CallWindowProcW(
+          original_settings_double_click_modifier_proc_,
+          window,
+          message,
+          wparam,
+          lparam);
+      return dialog_code | DLGC_WANTALLKEYS;
+    }
     case WM_KEYDOWN:
     case WM_SYSKEYDOWN: {
       if (const auto key = DoubleClickModifierKeyFromVirtualKey(static_cast<DWORD>(wparam));
