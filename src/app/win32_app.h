@@ -72,7 +72,7 @@ class Win32App {
   bool SetupTrayIcon();
   void RemoveTrayIcon();
   void UnregisterToggleHotKey();
-  void ShowTrayMenu();
+  void ShowTrayMenu(const POINT* anchor = nullptr);
   void OpenSettingsWindow();
   void CloseSettingsWindow();
   bool ApplySettingsWindowChanges();

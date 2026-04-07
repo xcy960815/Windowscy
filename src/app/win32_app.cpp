@@ -156,6 +156,18 @@ std::wstring BuildTrayTooltip(bool capture_enabled, const HistoryStore& store) {
   return win32::Utf8ToWide(tooltip);
 }
 
+UINT TrayNotifyCode(LPARAM lparam) {
+  return LOWORD(static_cast<DWORD>(lparam));
+}
+
+POINT TrayAnchorPoint(WPARAM wparam) {
+  const DWORD coordinates = static_cast<DWORD>(wparam);
+  POINT point{};
+  point.x = static_cast<LONG>(static_cast<short>(LOWORD(coordinates)));
+  point.y = static_cast<LONG>(static_cast<short>(HIWORD(coordinates)));
+  return point;
+}
+
 std::string JoinContentFormats(const HistoryItem& item) {
   std::string joined;
 
@@ -861,7 +873,7 @@ void Win32App::UnregisterToggleHotKey() {
   toggle_hotkey_registered_ = false;
 }
 
-void Win32App::ShowTrayMenu() {
+void Win32App::ShowTrayMenu(const POINT* anchor) {
   bool settings_changed = false;
 
   HMENU menu = CreatePopupMenu();
@@ -1029,8 +1041,10 @@ void Win32App::ShowTrayMenu() {
   AppendMenuW(menu, MF_SEPARATOR, 0, nullptr);
   AppendMenuW(menu, MF_STRING, kMenuExit, L"Exit");
 
-  POINT cursor{};
-  GetCursorPos(&cursor);
+  POINT cursor = anchor != nullptr ? *anchor : POINT{};
+  if ((cursor.x == 0 && cursor.y == 0) && GetCursorPos(&cursor) == FALSE) {
+    cursor = POINT{};
+  }
   SetForegroundWindow(controller_window_);
   const UINT command = TrackPopupMenu(
       menu,
@@ -2079,14 +2093,17 @@ LRESULT Win32App::HandleControllerMessage(HWND window, UINT message, WPARAM wpar
       HandleClipboardUpdate();
       return 0;
     case kTrayMessage:
-      switch (static_cast<UINT>(lparam)) {
+      switch (TrayNotifyCode(lparam)) {
         case WM_LBUTTONUP:
         case NIN_KEYSELECT:
           TogglePopup();
           return 0;
         case WM_RBUTTONUP:
         case WM_CONTEXTMENU:
-          ShowTrayMenu();
+          {
+            const POINT anchor = TrayAnchorPoint(wparam);
+            ShowTrayMenu(&anchor);
+          }
           return 0;
         default:
           break;
