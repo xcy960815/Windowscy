@@ -1,3 +1,8 @@
+/**
+ * @file search.cpp
+ * @brief 搜索功能实现
+ */
+
 #include "core/search.h"
 
 #include <algorithm>
@@ -10,6 +15,11 @@ namespace maccy {
 
 namespace {
 
+/**
+ * @brief 获取所有历史记录项的指针
+ * @param items 历史记录项列表
+ * @return std::vector<const HistoryItem*> 历史记录项指针列表
+ */
 std::vector<const HistoryItem*> AllItems(const std::vector<HistoryItem>& items) {
   std::vector<const HistoryItem*> results;
   results.reserve(items.size());
@@ -21,6 +31,12 @@ std::vector<const HistoryItem*> AllItems(const std::vector<HistoryItem>& items) 
   return results;
 }
 
+/**
+ * @brief 计算模糊匹配分数
+ * @param normalized_query 标准化后的查询词
+ * @param normalized_candidate 标准化后的候选文本
+ * @return std::optional<int> 匹配分数，越低表示越匹配
+ */
 std::optional<int> FuzzyScore(std::string_view normalized_query, std::string_view normalized_candidate) {
   if (normalized_query.empty()) {
     return 0;

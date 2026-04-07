@@ -1,3 +1,8 @@
+/**
+ * @file startup.cpp
+ * @brief Windows 开机启动实现
+ */
+
 #ifdef _WIN32
 
 #include "platform/win32/startup.h"
@@ -10,9 +15,15 @@ namespace maccy::win32 {
 
 namespace {
 
+/** 注册表运行键路径 */
 constexpr wchar_t kRunKeyPath[] = L"Software\\Microsoft\\Windows\\CurrentVersion\\Run";
+/** 注册表值名称 */
 constexpr wchar_t kRunValueName[] = L"MaccyWindows";
 
+/**
+ * @brief 获取当前可执行文件路径
+ * @return std::wstring 当前可执行文件的完整路径
+ */
 std::wstring CurrentExecutablePath() {
   std::wstring path(MAX_PATH, L'\0');
   DWORD length = GetModuleFileNameW(nullptr, path.data(), static_cast<DWORD>(path.size()));

@@ -1,3 +1,8 @@
+/**
+ * @file settings.cpp
+ * @brief 应用程序设置实现
+ */
+
 #include "core/settings.h"
 
 #include <algorithm>
@@ -12,8 +17,15 @@ namespace maccy {
 
 namespace {
 
+/** 设置文件魔数头部 */
 constexpr char kMagicHeader[] = "MACCY_SETTINGS_V1";
 
+/**
+ * @brief 转义文本
+ * @details 对特殊字符进行转义：\\、\\n、\\r、\\t
+ * @param value 要转义的文本
+ * @return std::string 转义后的文本
+ */
 std::string EscapeText(std::string_view value) {
   std::string escaped;
   escaped.reserve(value.size());
@@ -41,6 +53,11 @@ std::string EscapeText(std::string_view value) {
   return escaped;
 }
 
+/**
+ * @brief 反转义文本
+ * @param value 要反转义的文本
+ * @return std::string 反转义后的文本
+ */
 std::string UnescapeText(std::string_view value) {
   std::string unescaped;
   unescaped.reserve(value.size());
@@ -84,6 +101,11 @@ std::string UnescapeText(std::string_view value) {
   return unescaped;
 }
 
+/**
+ * @brief 分割 Tab 分隔的字段
+ * @param line 要分割的行
+ * @return std::vector<std::string> 分割后的字段列表
+ */
 std::vector<std::string> SplitTabFields(const std::string& line) {
   std::vector<std::string> fields;
   std::string current;
@@ -101,10 +123,20 @@ std::vector<std::string> SplitTabFields(const std::string& line) {
   return fields;
 }
 
+/**
+ * @brief 解析布尔值
+ * @param value 字符串值
+ * @return bool 解析后的布尔值
+ */
 bool ParseBool(std::string_view value) {
   return value == "1" || value == "true";
 }
 
+/**
+ * @brief 解析大小值
+ * @param value 字符串值
+ * @return std::size_t 解析后的大小值
+ */
 std::size_t ParseSize(std::string_view value) {
   try {
     return static_cast<std::size_t>(std::stoull(std::string(value)));
@@ -113,6 +145,11 @@ std::size_t ParseSize(std::string_view value) {
   }
 }
 
+/**
+ * @brief 解析整数值
+ * @param value 字符串值
+ * @return int 解析后的整数值
+ */
 int ParseInt(std::string_view value) {
   try {
     return std::stoi(std::string(value));
@@ -121,6 +158,11 @@ int ParseInt(std::string_view value) {
   }
 }
 
+/**
+ * @brief 解析无符号 32 位整数
+ * @param value 字符串值
+ * @return std::uint32_t 解析后的整数值
+ */
 std::uint32_t ParseUInt32(std::string_view value) {
   try {
     return static_cast<std::uint32_t>(std::stoul(std::string(value)));
@@ -129,6 +171,11 @@ std::uint32_t ParseUInt32(std::string_view value) {
   }
 }
 
+/**
+ * @brief 将固定位置转换为字符串
+ * @param position 固定位置
+ * @return std::string_view 位置对应的字符串
+ */
 std::string_view ToString(PinPosition position) {
   switch (position) {
     case PinPosition::kTop:
@@ -140,6 +187,11 @@ std::string_view ToString(PinPosition position) {
   return "top";
 }
 
+/**
+ * @brief 将历史排序方式转换为字符串
+ * @param order 历史排序方式
+ * @return std::string_view 排序方式对应的字符串
+ */
 std::string_view ToString(HistorySortOrder order) {
   switch (order) {
     case HistorySortOrder::kLastCopied:
@@ -153,10 +205,20 @@ std::string_view ToString(HistorySortOrder order) {
   return "last_copied";
 }
 
+/**
+ * @brief 解析固定位置
+ * @param value 字符串值
+ * @return PinPosition 对应的固定位置
+ */
 PinPosition ParsePinPosition(std::string_view value) {
   return value == "bottom" ? PinPosition::kBottom : PinPosition::kTop;
 }
 
+/**
+ * @brief 解析历史排序方式
+ * @param value 字符串值
+ * @return HistorySortOrder 对应的排序方式
+ */
 HistorySortOrder ParseHistorySortOrder(std::string_view value) {
   if (value == "first_copied") {
     return HistorySortOrder::kFirstCopied;
@@ -167,6 +229,11 @@ HistorySortOrder ParseHistorySortOrder(std::string_view value) {
   return HistorySortOrder::kLastCopied;
 }
 
+/**
+ * @brief 解析搜索模式
+ * @param value 字符串值
+ * @return SearchMode 对应的搜索模式
+ */
 SearchMode ParseSearchMode(std::string_view value) {
   if (value == "exact") {
     return SearchMode::kExact;
@@ -180,6 +247,10 @@ SearchMode ParseSearchMode(std::string_view value) {
   return SearchMode::kMixed;
 }
 
+/**
+ * @brief 限制弹窗设置值
+ * @param popup 弹窗设置
+ */
 void ClampPopupSettings(PopupSettings& popup) {
   popup.width = std::max(420, popup.width);
   popup.height = std::max(280, popup.height);

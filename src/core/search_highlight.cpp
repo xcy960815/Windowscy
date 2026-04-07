@@ -1,3 +1,8 @@
+/**
+ * @file search_highlight.cpp
+ * @brief 搜索高亮功能实现
+ */
+
 #include "core/search_highlight.h"
 
 #include <algorithm>
@@ -11,6 +16,11 @@ namespace maccy {
 
 namespace {
 
+/**
+ * @brief 转换为小写
+ * @param value 要转换的文本
+ * @return std::string 小写文本
+ */
 std::string Lowercase(std::string_view value) {
   std::string lowered;
   lowered.reserve(value.size());
@@ -22,6 +32,12 @@ std::string Lowercase(std::string_view value) {
   return lowered;
 }
 
+/**
+ * @brief 精确匹配高亮
+ * @param query 查询词
+ * @param candidate 候选文本
+ * @return std::vector<HighlightSpan> 高亮区间列表
+ */
 std::vector<HighlightSpan> ExactHighlight(std::string_view query, std::string_view candidate) {
   const std::string lowered_query = Lowercase(query);
   if (lowered_query.empty()) {
@@ -37,6 +53,12 @@ std::vector<HighlightSpan> ExactHighlight(std::string_view query, std::string_vi
   return {{position, lowered_query.size()}};
 }
 
+/**
+ * @brief 模糊匹配高亮
+ * @param query 查询词
+ * @param candidate 候选文本
+ * @return std::vector<HighlightSpan> 高亮区间列表
+ */
 std::vector<HighlightSpan> FuzzyHighlight(std::string_view query, std::string_view candidate) {
   const std::string lowered_query = Lowercase(query);
   const std::string lowered_candidate = Lowercase(candidate);
@@ -66,6 +88,12 @@ std::vector<HighlightSpan> FuzzyHighlight(std::string_view query, std::string_vi
   return spans;
 }
 
+/**
+ * @brief 正则匹配高亮
+ * @param query 正则表达式
+ * @param candidate 候选文本
+ * @return std::vector<HighlightSpan> 高亮区间列表
+ */
 std::vector<HighlightSpan> RegexpHighlight(std::string_view query, std::string_view candidate) {
   if (query.empty()) {
     return {};

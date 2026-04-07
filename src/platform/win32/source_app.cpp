@@ -1,3 +1,8 @@
+/**
+ * @file source_app.cpp
+ * @brief Windows 剪贴板源应用检测实现
+ */
+
 #ifdef _WIN32
 
 #include "platform/win32/source_app.h"
@@ -14,6 +19,11 @@ namespace maccy::win32 {
 
 namespace {
 
+/**
+ * @brief 读取窗口标题
+ * @param window 窗口句柄
+ * @return std::wstring 窗口标题
+ */
 std::wstring ReadWindowTitle(HWND window) {
   const int length = GetWindowTextLengthW(window);
   if (length <= 0) {
@@ -26,6 +36,11 @@ std::wstring ReadWindowTitle(HWND window) {
   return title;
 }
 
+/**
+ * @brief 读取进程可执行文件路径
+ * @param process_id 进程 ID
+ * @return std::wstring 可执行文件路径
+ */
 std::wstring ReadProcessImageName(DWORD process_id) {
   HANDLE process = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, FALSE, process_id);
   if (process == nullptr) {

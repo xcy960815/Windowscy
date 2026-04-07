@@ -1,3 +1,8 @@
+/**
+ * @file double_click_modifier.cpp
+ * @brief 双击修饰符键检测实现
+ */
+
 #include "core/double_click_modifier.h"
 
 #include <utility>

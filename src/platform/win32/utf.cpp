@@ -1,3 +1,8 @@
+/**
+ * @file utf.cpp
+ * @brief UTF-8 和宽字符转换实现
+ */
+
 #ifdef _WIN32
 
 #include "platform/win32/utf.h"

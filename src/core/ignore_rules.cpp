@@ -1,3 +1,8 @@
+/**
+ * @file ignore_rules.cpp
+ * @brief 忽略规则实现
+ */
+
 #include "core/ignore_rules.h"
 
 #include <algorithm>
@@ -10,6 +15,12 @@ namespace maccy {
 
 namespace {
 
+/**
+ * @brief 标准化标识符
+ * @details 将标识符转换为小写形式
+ * @param value 要标准化的标识符
+ * @return std::string 标准化后的标识符
+ */
 std::string NormalizeIdentifier(std::string_view value) {
   std::string normalized;
   normalized.reserve(value.size());
@@ -21,6 +32,12 @@ std::string NormalizeIdentifier(std::string_view value) {
   return normalized;
 }
 
+/**
+ * @brief 检查是否匹配列表中的值
+ * @param values 值列表
+ * @param candidate 要检查的候选值
+ * @return bool 是否匹配
+ */
 bool MatchesListValue(const std::vector<std::string>& values, std::string_view candidate) {
   if (candidate.empty()) {
     return false;
@@ -35,6 +52,12 @@ bool MatchesListValue(const std::vector<std::string>& values, std::string_view c
       });
 }
 
+/**
+ * @brief 检查格式是否启用
+ * @param rules 忽略规则
+ * @param blob 内容块
+ * @return bool 格式是否启用
+ */
 bool IsFormatEnabled(const IgnoreRules& rules, const ContentBlob& blob) {
   const auto ignored_by_name = std::any_of(
       rules.ignored_formats.begin(),
@@ -66,10 +89,21 @@ bool IsFormatEnabled(const IgnoreRules& rules, const ContentBlob& blob) {
   return true;
 }
 
+/**
+ * @brief 检查是否为文本内容块
+ * @param blob 内容块
+ * @return bool 是否为文本内容
+ */
 bool IsTextualBlob(const ContentBlob& blob) {
   return blob.format != ContentFormat::kImage;
 }
 
+/**
+ * @brief 检查是否匹配忽略模式
+ * @param rules 忽略规则
+ * @param item 历史记录项
+ * @return bool 是否匹配忽略模式
+ */
 bool MatchesIgnoredPattern(const IgnoreRules& rules, const HistoryItem& item) {
   if (rules.ignored_patterns.empty()) {
     return false;

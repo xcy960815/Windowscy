@@ -1,3 +1,8 @@
+/**
+ * @file history_persistence.cpp
+ * @brief 历史记录持久化实现
+ */
+
 #include "core/history_persistence.h"
 
 #include <filesystem>
@@ -12,8 +17,15 @@ namespace maccy {
 
 namespace {
 
+/** 历史文件魔数头部 */
 constexpr char kMagicHeader[] = "MACCY_HISTORY_V1";
 
+/**
+ * @brief 转义文本
+ * @details 对特殊字符进行转义：\\、\\n、\\r、\\t
+ * @param value 要转义的文本
+ * @return std::string 转义后的文本
+ */
 std::string EscapeText(std::string_view value) {
   std::string escaped;
   escaped.reserve(value.size());
@@ -41,6 +53,11 @@ std::string EscapeText(std::string_view value) {
   return escaped;
 }
 
+/**
+ * @brief 反转义文本
+ * @param value 要反转义的文本
+ * @return std::string 反转义后的文本
+ */
 std::string UnescapeText(std::string_view value) {
   std::string unescaped;
   unescaped.reserve(value.size());
@@ -83,6 +100,11 @@ std::string UnescapeText(std::string_view value) {
   return unescaped;
 }
 
+/**
+ * @brief Hex 编码
+ * @param bytes 要编码的字节数据
+ * @return std::string Hex 编码后的字符串
+ */
 std::string HexEncode(std::string_view bytes) {
   constexpr char kDigits[] = "0123456789ABCDEF";
   std::string encoded;
@@ -96,6 +118,11 @@ std::string HexEncode(std::string_view bytes) {
   return encoded;
 }
 
+/**
+ * @brief 获取字符的 Hex 值
+ * @param ch 字符
+ * @return int Hex 值，-1 表示无效
+ */
 int HexValue(char ch) {
   if (ch >= '0' && ch <= '9') {
     return ch - '0';
@@ -109,6 +136,11 @@ int HexValue(char ch) {
   return -1;
 }
 
+/**
+ * @brief Hex 解码
+ * @param text Hex 编码的字符串
+ * @return std::string 解码后的字节数据
+ */
 std::string HexDecode(std::string_view text) {
   std::string decoded;
   if (text.size() % 2 != 0) {
@@ -128,6 +160,11 @@ std::string HexDecode(std::string_view text) {
   return decoded;
 }
 
+/**
+ * @brief 分割 Tab 分隔的字段
+ * @param line 要分割的行
+ * @return std::vector<std::string> 分割后的字段列表
+ */
 std::vector<std::string> SplitTabFields(const std::string& line) {
   std::vector<std::string> fields;
   std::string current;
@@ -145,10 +182,20 @@ std::vector<std::string> SplitTabFields(const std::string& line) {
   return fields;
 }
 
+/**
+ * @brief 解析布尔值
+ * @param value 字符串值
+ * @return bool 解析后的布尔值
+ */
 bool ParseBool(std::string_view value) {
   return value == "1" || value == "true";
 }
 
+/**
+ * @brief 解析无符号 64 位整数
+ * @param value 字符串值
+ * @return std::uint64_t 解析后的整数值
+ */
 std::uint64_t ParseUint64(std::string_view value) {
   try {
     return static_cast<std::uint64_t>(std::stoull(std::string(value)));
@@ -157,6 +204,11 @@ std::uint64_t ParseUint64(std::string_view value) {
   }
 }
 
+/**
+ * @brief 解析内容格式
+ * @param value 格式值
+ * @return ContentFormat 对应的内容格式
+ */
 ContentFormat ParseFormat(std::string_view value) {
   switch (ParseUint64(value)) {
     case 0:

@@ -1,3 +1,8 @@
+/**
+ * @file clipboard.cpp
+ * @brief Windows 剪贴板操作实现
+ */
+
 #ifdef _WIN32
 
 #include "platform/win32/clipboard.h"
@@ -22,9 +27,16 @@ namespace maccy::win32 {
 
 namespace {
 
+/** HTML 剪贴板格式名称 */
 constexpr wchar_t kHtmlClipboardFormatName[] = L"HTML Format";
+/** RTF 剪贴板格式名称 */
 constexpr wchar_t kRtfClipboardFormatName[] = L"Rich Text Format";
 
+/**
+ * @brief 移除尾部空字符
+ * @param value 要处理的字符串
+ * @return std::string 移除尾部空字符后的字符串
+ */
 std::string TrimTrailingNull(std::string value) {
   while (!value.empty() && value.back() == '\0') {
     value.pop_back();
@@ -32,6 +44,11 @@ std::string TrimTrailingNull(std::string value) {
   return value;
 }
 
+/**
+ * @brief 从剪贴板句柄读取字节数据
+ * @param clipboard_data 剪贴板数据句柄
+ * @return std::optional<std::string> 读取的字节数据
+ */
 std::optional<std::string> ReadBytesFromHandle(HANDLE clipboard_data) {
   if (clipboard_data == nullptr) {
     return std::nullopt;
@@ -52,6 +69,11 @@ std::optional<std::string> ReadBytesFromHandle(HANDLE clipboard_data) {
   return result;
 }
 
+/**
+ * @brief 从指定格式读取 UTF-8 文本
+ * @param format 剪贴板格式
+ * @return std::optional<std::string> 读取的文本
+ */
 std::optional<std::string> ReadUtf8TextFromFormat(UINT format) {
   const HANDLE clipboard_data = GetClipboardData(format);
   if (clipboard_data == nullptr) {
@@ -68,6 +90,11 @@ std::optional<std::string> ReadUtf8TextFromFormat(UINT format) {
   return result;
 }
 
+/**
+ * @brief 从指定格式读取原始数据
+ * @param format 剪贴板格式
+ * @return std::optional<std::string> 读取的原始数据
+ */
 std::optional<std::string> ReadRawFormat(UINT format) {
   if (format == 0 || IsClipboardFormatAvailable(format) == FALSE) {
     return std::nullopt;
@@ -80,6 +107,10 @@ std::optional<std::string> ReadRawFormat(UINT format) {
   return std::nullopt;
 }
 
+/**
+ * @brief 读取文件列表文本
+ * @return std::optional<std::string> 文件列表文本
+ */
 std::optional<std::string> ReadFileListText() {
   if (IsClipboardFormatAvailable(CF_HDROP) == FALSE) {
     return std::nullopt;
@@ -115,6 +146,11 @@ std::optional<std::string> ReadFileListText() {
   return joined.empty() ? std::nullopt : std::make_optional(joined);
 }
 
+/**
+ * @brief 移除 HTML 标签
+ * @param value 包含 HTML 标签的文本
+ * @return std::string 移除标签后的纯文本
+ */
 std::string StripHtmlTags(std::string_view value) {
   std::string plain_text;
   plain_text.reserve(value.size());
@@ -138,6 +174,12 @@ std::string StripHtmlTags(std::string_view value) {
   return plain_text;
 }
 
+/**
+ * @brief 解析 HTML 偏移量
+ * @param value HTML 格式字符串
+ * @param key 要查找的关键字
+ * @return std::optional<std::size_t> 解析得到的偏移量
+ */
 std::optional<std::size_t> ParseHtmlOffset(std::string_view value, std::string_view key) {
   const std::size_t key_position = value.find(key);
   if (key_position == std::string_view::npos) {
@@ -166,6 +208,11 @@ std::optional<std::size_t> ParseHtmlOffset(std::string_view value, std::string_v
   }
 }
 
+/**
+ * @brief 提取 HTML 片段
+ * @param value HTML 格式字符串
+ * @return std::string_view HTML 内容片段
+ */
 std::string_view ExtractHtmlFragment(std::string_view value) {
   if (const auto start = ParseHtmlOffset(value, "StartFragment:");
       start.has_value()) {
@@ -188,6 +235,11 @@ std::string_view ExtractHtmlFragment(std::string_view value) {
   return value;
 }
 
+/**
+ * @brief 从 RTF 文本中提取纯文本
+ * @param value RTF 格式字符串
+ * @return std::string 提取的纯文本
+ */
 std::string ExtractRtfText(std::string_view value) {
   std::string plain_text;
   plain_text.reserve(value.size());
@@ -233,14 +285,29 @@ std::string ExtractRtfText(std::string_view value) {
   return plain_text;
 }
 
+/**
+ * @brief 从 HTML 标记构建历史标题
+ * @param markup HTML 标记
+ * @return std::string 生成的标题
+ */
 std::string BuildHistoryTitleFromMarkup(std::string_view markup) {
   return BuildHistoryTitleFromText(StripHtmlTags(ExtractHtmlFragment(markup)));
 }
 
+/**
+ * @brief 从 RTF 构建历史标题
+ * @param rtf RTF 内容
+ * @return std::string 生成的标题
+ */
 std::string BuildHistoryTitleFromRtf(std::string_view rtf) {
   return BuildHistoryTitleFromText(ExtractRtfText(rtf));
 }
 
+/**
+ * @brief 从文件列表构建历史标题
+ * @param file_list 文件列表
+ * @return std::string 生成的标题
+ */
 std::string BuildHistoryTitleFromFileList(std::string_view file_list) {
   std::vector<std::string> paths;
   std::string current;
@@ -278,6 +345,11 @@ std::string BuildHistoryTitleFromFileList(std::string_view file_list) {
   return first_name + " +" + std::to_string(paths.size() - 1) + " files";
 }
 
+/**
+ * @brief 从图片数据构建历史标题
+ * @param dib_payload DIB 图片数据
+ * @return std::string 生成的标题
+ */
 std::string BuildHistoryTitleFromImage(std::string_view dib_payload) {
   if (dib_payload.size() >= sizeof(BITMAPINFOHEADER)) {
     const auto* header = reinterpret_cast<const BITMAPINFOHEADER*>(dib_payload.data());
@@ -292,6 +364,13 @@ std::string BuildHistoryTitleFromImage(std::string_view dib_payload) {
   return "Image";
 }
 
+/**
+ * @brief 设置剪贴板字节数据
+ * @param format 剪贴板格式
+ * @param bytes 字节数据
+ * @param append_trailing_null 是否追加尾部空字符
+ * @return bool 设置是否成功
+ */
 bool SetClipboardBytes(UINT format, std::string_view bytes, bool append_trailing_null = false) {
   const std::size_t size = bytes.size() + (append_trailing_null ? 1 : 0);
   HGLOBAL global = GlobalAlloc(GMEM_MOVEABLE, size);
@@ -321,6 +400,11 @@ bool SetClipboardBytes(UINT format, std::string_view bytes, bool append_trailing
   return true;
 }
 
+/**
+ * @brief 设置剪贴板宽文本
+ * @param text 要设置的文本
+ * @return bool 设置是否成功
+ */
 bool SetClipboardWideText(std::string_view text) {
   const std::wstring wide_text = Utf8ToWide(text);
   const std::size_t bytes = (wide_text.size() + 1) * sizeof(wchar_t);
@@ -347,6 +431,11 @@ bool SetClipboardWideText(std::string_view text) {
   return true;
 }
 
+/**
+ * @brief 设置剪贴板文件列表
+ * @param file_list 文件列表文本
+ * @return bool 设置是否成功
+ */
 bool SetClipboardFileList(std::string_view file_list) {
   std::vector<std::wstring> paths;
   std::string current;
@@ -413,6 +502,13 @@ bool SetClipboardFileList(std::string_view file_list) {
   return true;
 }
 
+/**
+ * @brief 添加内容到历史记录项
+ * @param item 历史记录项
+ * @param format 内容格式
+ * @param format_name 格式名称
+ * @param payload 内容载荷
+ */
 void AddContent(
     HistoryItem& item,
     ContentFormat format,

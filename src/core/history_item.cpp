@@ -1,3 +1,8 @@
+/**
+ * @file history_item.cpp
+ * @brief 历史记录项实现
+ */
+
 #include "core/history_item.h"
 
 #include <algorithm>
@@ -9,6 +14,12 @@ namespace maccy {
 
 namespace {
 
+/**
+ * @brief 折叠空白字符
+ * @details 将连续的空白字符压缩为单个空格，并转换为小写
+ * @param value 输入文本
+ * @return std::string 标准化后的文本
+ */
 std::string CollapseWhitespace(std::string_view value) {
   std::string normalized;
   normalized.reserve(value.size());
@@ -33,6 +44,11 @@ std::string CollapseWhitespace(std::string_view value) {
   return normalized;
 }
 
+/**
+ * @brief 移除 HTML 标签
+ * @param value 包含 HTML 标签的文本
+ * @return std::string 移除标签后的纯文本
+ */
 std::string StripHtmlTags(std::string_view value) {
   std::string plain_text;
   plain_text.reserve(value.size());
@@ -56,6 +72,12 @@ std::string StripHtmlTags(std::string_view value) {
   return plain_text;
 }
 
+/**
+ * @brief 解析 HTML 偏移量
+ * @param value HTML 格式字符串
+ * @param key 要查找的关键字
+ * @return std::optional<std::size_t> 解析得到的偏移量
+ */
 std::optional<std::size_t> ParseHtmlOffset(std::string_view value, std::string_view key) {
   const std::size_t key_position = value.find(key);
   if (key_position == std::string_view::npos) {
@@ -84,6 +106,11 @@ std::optional<std::size_t> ParseHtmlOffset(std::string_view value, std::string_v
   }
 }
 
+/**
+ * @brief 提取 HTML 片段
+ * @param value HTML 格式字符串
+ * @return std::string_view HTML 内容片段
+ */
 std::string_view ExtractHtmlFragment(std::string_view value) {
   if (const auto start = ParseHtmlOffset(value, "StartFragment:");
       start.has_value()) {
@@ -106,6 +133,11 @@ std::string_view ExtractHtmlFragment(std::string_view value) {
   return value;
 }
 
+/**
+ * @brief 从 RTF 文本中提取纯文本
+ * @param value RTF 格式字符串
+ * @return std::string 提取的纯文本
+ */
 std::string ExtractRtfText(std::string_view value) {
   std::string plain_text;
   plain_text.reserve(value.size());
@@ -151,6 +183,11 @@ std::string ExtractRtfText(std::string_view value) {
   return plain_text;
 }
 
+/**
+ * @brief 检查是否为可打印文本
+ * @param value 要检查的文本
+ * @return bool 是否为可打印文本
+ */
 bool IsPrintableText(std::string_view value) {
   return std::any_of(
       value.begin(),
@@ -160,6 +197,11 @@ bool IsPrintableText(std::string_view value) {
       });
 }
 
+/**
+ * @brief 获取格式的显示标签
+ * @param format 内容格式
+ * @return std::string 格式的显示标签
+ */
 std::string DisplayLabelForFormat(ContentFormat format) {
   switch (format) {
     case ContentFormat::kPlainText:

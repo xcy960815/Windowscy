@@ -1,3 +1,8 @@
+/**
+ * @file history_store.cpp
+ * @brief 历史记录存储实现
+ */
+
 #include "core/history_store.h"
 
 #include <algorithm>
@@ -7,12 +12,24 @@ namespace maccy {
 
 namespace {
 
+/**
+ * @brief 比较两个内容块是否相等
+ * @param lhs 左侧内容块
+ * @param rhs 右侧内容块
+ * @return bool 是否相等
+ */
 bool BlobEquals(const ContentBlob& lhs, const ContentBlob& rhs) {
   return lhs.format == rhs.format &&
          lhs.format_name == rhs.format_name &&
          lhs.text_payload == rhs.text_payload;
 }
 
+/**
+ * @brief 根据排序方式获取排序键值
+ * @param item 历史记录项
+ * @param order 排序方式
+ * @return std::uint64_t 排序键值
+ */
 std::uint64_t SortKeyForOrder(const HistoryItem& item, HistorySortOrder order) {
   switch (order) {
     case HistorySortOrder::kLastCopied:
