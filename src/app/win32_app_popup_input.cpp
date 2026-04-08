@@ -4,6 +4,43 @@
 
 namespace maccy {
 
+namespace {
+
+constexpr COLORREF kPopupRowSelected = RGB(232, 240, 255);
+constexpr COLORREF kPopupRowSelectedBorder = RGB(136, 170, 230);
+constexpr COLORREF kPopupPrimaryText = RGB(26, 31, 43);
+constexpr COLORREF kPopupSecondaryText = RGB(101, 112, 128);
+constexpr COLORREF kPopupPrefixText = RGB(94, 106, 128);
+constexpr COLORREF kPopupPinText = RGB(176, 96, 16);
+constexpr COLORREF kPopupHighlightText = RGB(24, 39, 74);
+constexpr COLORREF kPopupHighlightBackground = RGB(201, 222, 255);
+
+std::wstring PopupUnknownSourceLabel(bool use_chinese_ui) {
+  return UiText(use_chinese_ui, L"Unknown source", L"未知来源");
+}
+
+std::wstring BuildPopupItemSubtitle(bool use_chinese_ui, const HistoryItem& item) {
+  std::wstring subtitle =
+      item.metadata.source_application.empty() ? PopupUnknownSourceLabel(use_chinese_ui)
+                                               : win32::Utf8ToWide(item.metadata.source_application);
+
+  const std::wstring formats = JoinContentFormats(use_chinese_ui, item);
+  if (!formats.empty()) {
+    subtitle += L" / ";
+    subtitle += formats;
+  }
+
+  if (item.metadata.copy_count > 1) {
+    subtitle += L" / ";
+    subtitle += UiText(use_chinese_ui, L"Copies ", L"复制 ");
+    subtitle += std::to_wstring(item.metadata.copy_count);
+  }
+
+  return subtitle;
+}
+
+}  // namespace
+
 void Win32App::TogglePopup() {
   if (popup_window_ == nullptr) {
     return;
@@ -50,8 +87,8 @@ void Win32App::PositionPopupNearCursor() {
     return;
   }
 
-  const int width = std::max(420, settings_.popup.width);
-  const int height = std::max(280, settings_.popup.height);
+  const int width = std::max(520, settings_.popup.width);
+  const int height = std::max(320, settings_.popup.height);
 
   POINT cursor{};
   GetCursorPos(&cursor);
@@ -220,8 +257,8 @@ void Win32App::SavePopupPlacement() {
 
   settings_.popup.x = window_rect.left;
   settings_.popup.y = window_rect.top;
-  settings_.popup.width = std::max(420, static_cast<int>(window_rect.right - window_rect.left));
-  settings_.popup.height = std::max(280, static_cast<int>(window_rect.bottom - window_rect.top));
+  settings_.popup.width = std::max(520, static_cast<int>(window_rect.right - window_rect.left));
+  settings_.popup.height = std::max(320, static_cast<int>(window_rect.bottom - window_rect.top));
   settings_.popup.has_last_position = true;
 }
 
@@ -233,20 +270,52 @@ void Win32App::DrawPopupListItem(const DRAWITEMSTRUCT& draw_item) {
   HDC dc = draw_item.hDC;
   RECT rect = draw_item.rcItem;
   const bool selected = (draw_item.itemState & ODS_SELECTED) != 0;
-
-  FillRect(dc, &rect, GetSysColorBrush(selected ? COLOR_HIGHLIGHT : COLOR_WINDOW));
+  FillRect(
+      dc,
+      &rect,
+      popup_surface_brush_ != nullptr
+          ? popup_surface_brush_
+          : static_cast<HBRUSH>(GetStockObject(WHITE_BRUSH)));
   SetBkMode(dc, TRANSPARENT);
 
-  const COLORREF base_text_color = GetSysColor(selected ? COLOR_HIGHLIGHTTEXT : COLOR_WINDOWTEXT);
-  const COLORREF prefix_color = selected ? base_text_color : RGB(120, 120, 120);
-  const COLORREF pin_color = selected ? base_text_color : RGB(176, 96, 16);
-  const COLORREF highlight_text_color = selected ? RGB(255, 255, 255) : RGB(32, 32, 32);
-  const COLORREF highlight_background = selected ? RGB(48, 92, 160) : RGB(255, 231, 153);
+  RECT content_rect{
+      rect.left + 4,
+      rect.top + 3,
+      rect.right - 4,
+      rect.bottom - 3,
+  };
+  if (selected) {
+    const HGDIOBJ old_brush = SelectObject(
+        dc,
+        CreateSolidBrush(kPopupRowSelected));
+    const HGDIOBJ old_pen = SelectObject(
+        dc,
+        CreatePen(PS_SOLID, 1, kPopupRowSelectedBorder));
+    RoundRect(dc, content_rect.left, content_rect.top, content_rect.right, content_rect.bottom, 12, 12);
+    DeleteObject(SelectObject(dc, old_pen));
+    DeleteObject(SelectObject(dc, old_brush));
+  } else {
+    RECT separator{
+        rect.left + 12,
+        rect.bottom - 1,
+        rect.right - 12,
+        rect.bottom,
+    };
+    FillRect(dc, &separator, popup_window_background_brush_ != nullptr ? popup_window_background_brush_
+                                                                       : static_cast<HBRUSH>(GetStockObject(WHITE_BRUSH)));
+  }
 
-  const int padding_x = 8;
-  const int padding_y = 4;
+  const COLORREF base_text_color = kPopupPrimaryText;
+  const COLORREF prefix_color = selected ? RGB(76, 93, 128) : kPopupPrefixText;
+  const COLORREF pin_color = selected ? RGB(140, 82, 24) : kPopupPinText;
+  const COLORREF highlight_text_color = kPopupHighlightText;
+  const COLORREF highlight_background = selected ? RGB(191, 214, 255) : kPopupHighlightBackground;
+  const COLORREF subtitle_color = selected ? RGB(79, 95, 122) : kPopupSecondaryText;
+
+  const int padding_x = 16;
   int x = rect.left + padding_x;
-  const int y = rect.top + padding_y;
+  const int title_y = rect.top + 10;
+  const int subtitle_y = rect.top + 31;
 
   if (draw_item.itemID >= visible_item_ids_.size()) {
     const LRESULT text_length = SendMessageW(list_box_, LB_GETTEXTLEN, draw_item.itemID, 0);
@@ -258,7 +327,14 @@ void Win32App::DrawPopupListItem(const DRAWITEMSTRUCT& draw_item) {
       text = L"";
     }
 
-    DrawTextSegment(dc, x, y, text, base_text_color, std::nullopt);
+    RECT text_rect{rect.left + 18, rect.top + 8, rect.right - 18, rect.bottom - 8};
+    SetTextColor(dc, subtitle_color);
+    DrawTextW(
+        dc,
+        text.c_str(),
+        -1,
+        &text_rect,
+        DT_CENTER | DT_VCENTER | DT_SINGLELINE | DT_END_ELLIPSIS);
   } else {
     const std::uint64_t item_id = visible_item_ids_[draw_item.itemID];
     const HistoryItem* item = store_.FindById(item_id);
@@ -268,18 +344,25 @@ void Win32App::DrawPopupListItem(const DRAWITEMSTRUCT& draw_item) {
       const std::wstring pin_prefix = item->pinned ? std::wstring(UiText(use_chinese_ui_, L"[PIN] ", L"[置顶] ")) : L"";
       const std::string title_utf8 = item->PreferredDisplayText();
       const std::wstring title_wide = win32::Utf8ToWide(title_utf8);
+      const std::wstring subtitle = BuildPopupItemSubtitle(use_chinese_ui_, *item);
       const auto highlight_spans = ToWideHighlightSpans(
           title_utf8,
           BuildHighlightSpans(settings_.search_mode, search_query_, title_utf8));
 
-      DrawTextSegment(dc, x, y, number_prefix, prefix_color, std::nullopt);
+      const HGDIOBJ old_font = SelectObject(
+          dc,
+          popup_ui_emphasis_font_ != nullptr
+              ? popup_ui_emphasis_font_
+              : static_cast<HFONT>(GetStockObject(DEFAULT_GUI_FONT)));
+
+      DrawTextSegment(dc, x, title_y, number_prefix, prefix_color, std::nullopt);
       x += TextWidth(dc, number_prefix);
 
-      DrawTextSegment(dc, x, y, pin_prefix, pin_color, std::nullopt);
+      DrawTextSegment(dc, x, title_y, pin_prefix, pin_color, std::nullopt);
       x += TextWidth(dc, pin_prefix);
 
       if (highlight_spans.empty()) {
-        DrawTextSegment(dc, x, y, title_wide, base_text_color, std::nullopt);
+        DrawTextSegment(dc, x, title_y, title_wide, base_text_color, std::nullopt);
       } else {
         int cursor = 0;
         for (const auto& span : highlight_spans) {
@@ -287,28 +370,35 @@ void Win32App::DrawPopupListItem(const DRAWITEMSTRUCT& draw_item) {
             const std::wstring_view leading = std::wstring_view(title_wide).substr(
                 static_cast<std::size_t>(cursor),
                 static_cast<std::size_t>(span.start - cursor));
-            DrawTextSegment(dc, x, y, leading, base_text_color, std::nullopt);
+            DrawTextSegment(dc, x, title_y, leading, base_text_color, std::nullopt);
             x += TextWidth(dc, leading);
           }
 
           const std::wstring_view highlighted = std::wstring_view(title_wide).substr(
               static_cast<std::size_t>(span.start),
               static_cast<std::size_t>(span.length));
-          DrawTextSegment(dc, x, y, highlighted, highlight_text_color, highlight_background);
+          DrawTextSegment(dc, x, title_y, highlighted, highlight_text_color, highlight_background);
           x += TextWidth(dc, highlighted);
           cursor = span.start + span.length;
         }
 
         if (cursor < static_cast<int>(title_wide.size())) {
           const std::wstring_view trailing = std::wstring_view(title_wide).substr(static_cast<std::size_t>(cursor));
-          DrawTextSegment(dc, x, y, trailing, base_text_color, std::nullopt);
+          DrawTextSegment(dc, x, title_y, trailing, base_text_color, std::nullopt);
         }
       }
-    }
-  }
 
-  if ((draw_item.itemState & ODS_FOCUS) != 0) {
-    DrawFocusRect(dc, &rect);
+      SelectObject(dc, old_font);
+
+      RECT subtitle_rect{rect.left + padding_x, subtitle_y, rect.right - 16, rect.bottom - 8};
+      SetTextColor(dc, subtitle_color);
+      DrawTextW(
+          dc,
+          subtitle.c_str(),
+          -1,
+          &subtitle_rect,
+          DT_SINGLELINE | DT_END_ELLIPSIS | DT_NOPREFIX);
+    }
   }
 }
 

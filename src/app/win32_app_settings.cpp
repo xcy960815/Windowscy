@@ -4,6 +4,24 @@
 
 namespace maccy {
 
+namespace {
+
+constexpr COLORREF kSettingsWindowBackground = RGB(246, 248, 252);
+constexpr COLORREF kSettingsCardBackground = RGB(255, 255, 255);
+constexpr COLORREF kSettingsCardBorder = RGB(220, 226, 236);
+constexpr COLORREF kSettingsPrimaryText = RGB(26, 31, 43);
+constexpr COLORREF kSettingsHintText = RGB(101, 112, 128);
+constexpr COLORREF kSettingsAccentText = RGB(23, 88, 195);
+constexpr COLORREF kSettingsInputBackground = RGB(255, 255, 255);
+constexpr int kSettingsHeaderTop = 18;
+constexpr int kSettingsHeaderHeight = 52;
+constexpr int kSettingsOuterPadding = 16;
+constexpr int kSettingsCardRadius = 14;
+constexpr int kSettingsControlHeight = 28;
+constexpr int kSettingsPrimaryButtonWidth = 108;
+
+}  // namespace
+
 void Win32App::OpenSettingsWindow() {
   active_double_click_modifier_flags_ = 0;
   double_click_modifier_detector_.Reset();
@@ -268,12 +286,72 @@ LRESULT Win32App::HandleSettingsWindowMessage(HWND window, UINT message, WPARAM 
     case WM_CREATE: {
       settings_window_ = window;
       const bool zh = use_chinese_ui_;
+      settings_text_elements_.clear();
+      settings_sections_.clear();
+
+      if (settings_window_background_brush_ == nullptr) {
+        settings_window_background_brush_ = CreateSolidBrush(kSettingsWindowBackground);
+      }
+      if (settings_card_brush_ == nullptr) {
+        settings_card_brush_ = CreateSolidBrush(kSettingsCardBackground);
+      }
+      if (settings_input_brush_ == nullptr) {
+        settings_input_brush_ = CreateSolidBrush(kSettingsInputBackground);
+      }
+      if (settings_card_border_pen_ == nullptr) {
+        settings_card_border_pen_ = CreatePen(PS_SOLID, 1, kSettingsCardBorder);
+      }
 
       const HFONT default_font = static_cast<HFONT>(GetStockObject(DEFAULT_GUI_FONT));
-      const auto apply_font = [default_font](HWND control) {
+      HDC window_dc = GetDC(window);
+      const int dpi = window_dc != nullptr ? GetDeviceCaps(window_dc, LOGPIXELSY) : 96;
+      if (window_dc != nullptr) {
+        ReleaseDC(window, window_dc);
+      }
+
+      const auto create_font = [dpi](int point_size, int weight) {
+        return CreateFontW(
+            -MulDiv(point_size, dpi, 72),
+            0,
+            0,
+            0,
+            weight,
+            FALSE,
+            FALSE,
+            FALSE,
+            DEFAULT_CHARSET,
+            OUT_DEFAULT_PRECIS,
+            CLIP_DEFAULT_PRECIS,
+            CLEARTYPE_QUALITY,
+            DEFAULT_PITCH | FF_DONTCARE,
+            L"Segoe UI");
+      };
+
+      if (settings_ui_font_ == nullptr) {
+        settings_ui_font_ = create_font(10, FW_NORMAL);
+      }
+      if (settings_ui_semibold_font_ == nullptr) {
+        settings_ui_semibold_font_ = create_font(10, FW_SEMIBOLD);
+      }
+      if (settings_ui_title_font_ == nullptr) {
+        settings_ui_title_font_ = create_font(17, FW_SEMIBOLD);
+      }
+
+      const HFONT body_font = settings_ui_font_ != nullptr ? settings_ui_font_ : default_font;
+      const HFONT semibold_font = settings_ui_semibold_font_ != nullptr ? settings_ui_semibold_font_ : default_font;
+      const HFONT title_font = settings_ui_title_font_ != nullptr ? settings_ui_title_font_ : default_font;
+      const auto apply_font = [](HWND control, HFONT font) {
         if (control != nullptr) {
-          SendMessageW(control, WM_SETFONT, reinterpret_cast<WPARAM>(default_font), TRUE);
+          SendMessageW(control, WM_SETFONT, reinterpret_cast<WPARAM>(font), TRUE);
         }
+      };
+      const auto track_text = [&](HWND control, SettingsTextRole role, HFONT font) {
+        if (control == nullptr) {
+          return;
+        }
+
+        apply_font(control, font);
+        settings_text_elements_.push_back({control, role});
       };
 
       const auto create_page = [&](HWND& target, const RECT& rect) {
@@ -290,15 +368,47 @@ LRESULT Win32App::HandleSettingsWindowMessage(HWND window, UINT message, WPARAM 
             nullptr,
             instance_,
             nullptr);
-        apply_font(target);
+        if (target != nullptr) {
+          SetWindowLongPtrW(target, GWLP_USERDATA, reinterpret_cast<LONG_PTR>(this));
+          const auto original_proc = reinterpret_cast<WNDPROC>(
+              SetWindowLongPtrW(target, GWLP_WNDPROC, reinterpret_cast<LONG_PTR>(StaticSettingsPageProc)));
+          if (original_settings_page_proc_ == nullptr) {
+            original_settings_page_proc_ = original_proc;
+          }
+        }
       };
 
-      const auto create_group = [&](HWND parent, int x, int y, int width, int height, const wchar_t* title) {
+      const auto create_card = [&](HWND parent, int x, int y, int width, int height, const wchar_t* title) {
+        settings_sections_.push_back({parent, RECT{x, y, x + width, y + height}});
         HWND control = CreateWindowExW(
             0,
-            L"BUTTON",
+            L"STATIC",
             title,
-            WS_CHILD | WS_VISIBLE | BS_GROUPBOX,
+            WS_CHILD | WS_VISIBLE,
+            x + 18,
+            y + 16,
+            width - 36,
+            20,
+            parent,
+            nullptr,
+            instance_,
+            nullptr);
+        track_text(control, SettingsTextRole::kSectionTitle, semibold_font);
+        return control;
+      };
+
+      const auto create_label = [&](HWND parent,
+                                    int x,
+                                    int y,
+                                    int width,
+                                    int height,
+                                    const wchar_t* text,
+                                    SettingsTextRole role = SettingsTextRole::kBody) {
+        HWND control = CreateWindowExW(
+            0,
+            L"STATIC",
+            text,
+            WS_CHILD | WS_VISIBLE,
             x,
             y,
             width,
@@ -307,28 +417,12 @@ LRESULT Win32App::HandleSettingsWindowMessage(HWND window, UINT message, WPARAM 
             nullptr,
             instance_,
             nullptr);
-        apply_font(control);
+        track_text(
+            control,
+            role,
+            role == SettingsTextRole::kSectionTitle ? semibold_font : body_font);
         return control;
       };
-
-      const auto create_label =
-          [&](HWND parent, int x, int y, int width, int height, const wchar_t* text) {
-            HWND control = CreateWindowExW(
-                0,
-                L"STATIC",
-                text,
-                WS_CHILD | WS_VISIBLE,
-                x,
-                y,
-                width,
-                height,
-                parent,
-                nullptr,
-                instance_,
-                nullptr);
-            apply_font(control);
-            return control;
-          };
 
       const auto create_checkbox =
           [&](HWND parent, HWND& target, int x, int y, int width, const wchar_t* text) {
@@ -340,12 +434,12 @@ LRESULT Win32App::HandleSettingsWindowMessage(HWND window, UINT message, WPARAM 
                 x,
                 y,
                 width,
-                22,
+                24,
                 parent,
                 nullptr,
                 instance_,
                 nullptr);
-            apply_font(target);
+            apply_font(target, body_font);
           };
 
       const auto create_combo = [&](HWND parent, HWND& target, int x, int y, int width) {
@@ -362,7 +456,11 @@ LRESULT Win32App::HandleSettingsWindowMessage(HWND window, UINT message, WPARAM 
             nullptr,
             instance_,
             nullptr);
-        apply_font(target);
+        apply_font(target, body_font);
+        if (target != nullptr) {
+          SendMessageW(target, CB_SETITEMHEIGHT, static_cast<WPARAM>(-1), 24);
+          SendMessageW(target, CB_SETITEMHEIGHT, 0, 20);
+        }
       };
 
       const auto create_readonly_input = [&](HWND parent, HWND& target, int x, int y, int width) {
@@ -374,14 +472,14 @@ LRESULT Win32App::HandleSettingsWindowMessage(HWND window, UINT message, WPARAM 
             x,
             y,
             width,
-            24,
+            kSettingsControlHeight,
             parent,
             nullptr,
             instance_,
             nullptr);
-        apply_font(target);
+        apply_font(target, body_font);
         if (target != nullptr) {
-          SendMessageW(target, EM_SETMARGINS, EC_LEFTMARGIN | EC_RIGHTMARGIN, MAKELPARAM(6, 6));
+          SendMessageW(target, EM_SETMARGINS, EC_LEFTMARGIN | EC_RIGHTMARGIN, MAKELPARAM(10, 10));
         }
       };
 
@@ -400,17 +498,55 @@ LRESULT Win32App::HandleSettingsWindowMessage(HWND window, UINT message, WPARAM 
                 nullptr,
                 instance_,
                 nullptr);
-            apply_font(target);
+            apply_font(target, body_font);
+            if (target != nullptr) {
+              SendMessageW(target, EM_SETMARGINS, EC_LEFTMARGIN | EC_RIGHTMARGIN, MAKELPARAM(10, 10));
+            }
           };
 
-      const int padding = 12;
-      const int button_width = 100;
-      const int button_height = 28;
+      const int padding = kSettingsOuterPadding;
+      const int button_width = kSettingsPrimaryButtonWidth;
+      const int button_height = 32;
+      const int header_top = kSettingsHeaderTop;
+      const int tab_top = header_top + kSettingsHeaderHeight + 4;
       const int button_y = kSettingsClientHeight - padding - button_height;
       const int close_x = kSettingsClientWidth - padding - button_width;
-      const int apply_x = close_x - 8 - button_width;
-      const int save_x = apply_x - 8 - button_width;
-      const int tab_height = button_y - padding - 12;
+      const int apply_x = close_x - 10 - button_width;
+      const int save_x = apply_x - 10 - button_width;
+      const int tab_height = button_y - tab_top - 14;
+
+      settings_header_title_ = CreateWindowExW(
+          0,
+          L"STATIC",
+          UiText(zh, L"ClipLoom Settings", L"ClipLoom 设置"),
+          WS_CHILD | WS_VISIBLE,
+          padding,
+          header_top,
+          340,
+          30,
+          window,
+          nullptr,
+          instance_,
+          nullptr);
+      apply_font(settings_header_title_, title_font);
+
+      settings_header_subtitle_ = CreateWindowExW(
+          0,
+          L"STATIC",
+          UiText(
+              zh,
+              L"Refresh the current Win32 interface first, then use it as the bridge toward a WinUI 3 shell.",
+              L"先把当前 Win32 界面打磨到可用且更现代，再以它为基线推进到 WinUI 3 外壳。"),
+          WS_CHILD | WS_VISIBLE,
+          padding,
+          header_top + 30,
+          kSettingsClientWidth - padding * 2 - 220,
+          20,
+          window,
+          nullptr,
+          instance_,
+          nullptr);
+      apply_font(settings_header_subtitle_, body_font);
 
       settings_tab_ = CreateWindowExW(
           0,
@@ -418,14 +554,14 @@ LRESULT Win32App::HandleSettingsWindowMessage(HWND window, UINT message, WPARAM 
           L"",
           WS_CHILD | WS_VISIBLE | WS_CLIPSIBLINGS | WS_TABSTOP,
           padding,
-          padding,
+          tab_top,
           kSettingsClientWidth - padding * 2,
           tab_height,
           window,
           reinterpret_cast<HMENU>(static_cast<INT_PTR>(kSettingsTabControlId)),
           instance_,
           nullptr);
-      apply_font(settings_tab_);
+      apply_font(settings_tab_, semibold_font);
 
       const wchar_t* tab_titles[] = {
           UiText(zh, L"General", L"常规"),
@@ -454,57 +590,60 @@ LRESULT Win32App::HandleSettingsWindowMessage(HWND window, UINT message, WPARAM 
 
       const int page_width = page_rect.right - page_rect.left;
       const int page_height = page_rect.bottom - page_rect.top;
-      const int page_padding = 12;
+      const int page_padding = 10;
       const int content_width = page_width - page_padding * 2;
 
-      create_group(settings_general_page_, page_padding, 12, content_width, 194, UiText(zh, L"Open", L"打开方式"));
+      create_card(settings_general_page_, page_padding, 12, content_width, 208, UiText(zh, L"Open", L"打开方式"));
       create_label(
           settings_general_page_,
           page_padding + 16,
-          36,
+          48,
           content_width - 32,
           18,
-          UiText(zh, L"Choose the global hotkey used to open the clipboard history popup.", L"选择用于打开剪贴板历史弹窗的全局快捷键。"));
-      create_checkbox(settings_general_page_, settings_hotkey_ctrl_check_, page_padding + 16, 60, 70, L"Ctrl");
-      create_checkbox(settings_general_page_, settings_hotkey_alt_check_, page_padding + 92, 60, 60, L"Alt");
-      create_checkbox(settings_general_page_, settings_hotkey_shift_check_, page_padding + 158, 60, 72, L"Shift");
-      create_checkbox(settings_general_page_, settings_hotkey_win_check_, page_padding + 236, 60, 64, L"Win");
-      create_combo(settings_general_page_, settings_hotkey_key_combo_, page_padding + 320, 56, 150);
+          UiText(zh, L"Choose the global hotkey used to open the clipboard history popup.", L"选择用于打开剪贴板历史弹窗的全局快捷键。"),
+          SettingsTextRole::kHint);
+      create_checkbox(settings_general_page_, settings_hotkey_ctrl_check_, page_padding + 16, 78, 70, L"Ctrl");
+      create_checkbox(settings_general_page_, settings_hotkey_alt_check_, page_padding + 92, 78, 60, L"Alt");
+      create_checkbox(settings_general_page_, settings_hotkey_shift_check_, page_padding + 158, 78, 72, L"Shift");
+      create_checkbox(settings_general_page_, settings_hotkey_win_check_, page_padding + 236, 78, 64, L"Win");
+      create_combo(settings_general_page_, settings_hotkey_key_combo_, page_padding + 320, 74, 150);
       create_label(
           settings_general_page_,
           page_padding + 16,
-          88,
+          112,
           content_width - 32,
           18,
-          UiText(zh, L"The previous hotkey is restored automatically if the new one can't be registered.", L"如果新的快捷键无法注册，程序会自动恢复之前的快捷键。"));
+          UiText(zh, L"The previous hotkey is restored automatically if the new one can't be registered.", L"如果新的快捷键无法注册，程序会自动恢复之前的快捷键。"),
+          SettingsTextRole::kHint);
       create_checkbox(
           settings_general_page_,
           settings_double_click_open_check_,
           page_padding + 16,
-          116,
+          142,
           content_width - 32,
           UiText(zh, L"Enable double-click modifier key to open", L"启用双击修饰键打开"));
       create_label(
           settings_general_page_,
           page_padding + 16,
-          144,
+          172,
           110,
           18,
           UiText(zh, L"Modifier key", L"修饰键"));
-      create_readonly_input(settings_general_page_, settings_double_click_modifier_input_, page_padding + 132, 140, 220);
+      create_readonly_input(settings_general_page_, settings_double_click_modifier_input_, page_padding + 132, 168, 220);
       create_label(
           settings_general_page_,
           page_padding + 16,
-          172,
+          198,
           content_width - 32,
           36,
           UiText(
               zh,
               L"When enabled, click the field and press Ctrl, Alt, or Shift to record it. Double-press that modifier to toggle clipboard history. Press Delete or Backspace to clear it.",
-              L"启用后，点击输入框并按下 Ctrl、Alt 或 Shift 完成录入。之后连按两次该修饰键即可切换剪贴板历史弹窗。按 Delete 或 Backspace 可清除。"));
+              L"启用后，点击输入框并按下 Ctrl、Alt 或 Shift 完成录入。之后连按两次该修饰键即可切换剪贴板历史弹窗。按 Delete 或 Backspace 可清除。"),
+          SettingsTextRole::kHint);
 
-      create_group(settings_general_page_, page_padding, 218, content_width, 172, UiText(zh, L"Behavior", L"行为"));
-      int general_y = 242;
+      create_card(settings_general_page_, page_padding, 232, content_width, 178, UiText(zh, L"Behavior", L"行为"));
+      int general_y = 268;
       create_checkbox(
           settings_general_page_,
           settings_capture_enabled_check_,
@@ -545,25 +684,26 @@ LRESULT Win32App::HandleSettingsWindowMessage(HWND window, UINT message, WPARAM 
           content_width - 32,
           UiText(zh, L"Show startup guide", L"显示启动引导"));
 
-      create_group(settings_general_page_, page_padding, 402, content_width, 90, UiText(zh, L"Search", L"搜索"));
-      create_label(settings_general_page_, page_padding + 16, 428, 110, 18, UiText(zh, L"Search mode", L"搜索模式"));
-      create_combo(settings_general_page_, settings_search_mode_combo_, page_padding + 132, 424, 180);
+      create_card(settings_general_page_, page_padding, 422, content_width, 98, UiText(zh, L"Search", L"搜索"));
+      create_label(settings_general_page_, page_padding + 16, 458, 110, 18, UiText(zh, L"Search mode", L"搜索模式"));
+      create_combo(settings_general_page_, settings_search_mode_combo_, page_padding + 132, 454, 180);
       create_label(
           settings_general_page_,
           page_padding + 16,
-          456,
+          486,
           content_width - 32,
           18,
-          UiText(zh, L"Matches the source project's exact, fuzzy, regexp, and mixed search modes.", L"对应源项目中的精确、模糊、正则和混合搜索模式。"));
+          UiText(zh, L"Matches the source project's exact, fuzzy, regexp, and mixed search modes.", L"对应源项目中的精确、模糊、正则和混合搜索模式。"),
+          SettingsTextRole::kHint);
 
-      create_group(settings_storage_page_, page_padding, 12, content_width, 126, UiText(zh, L"History", L"历史记录"));
-      create_label(settings_storage_page_, page_padding + 16, 40, 110, 18, UiText(zh, L"History limit", L"历史条数"));
-      create_combo(settings_storage_page_, settings_history_limit_combo_, page_padding + 132, 36, 180);
-      create_label(settings_storage_page_, page_padding + 16, 72, 110, 18, UiText(zh, L"Sort order", L"排序方式"));
-      create_combo(settings_storage_page_, settings_sort_order_combo_, page_padding + 132, 68, 180);
+      create_card(settings_storage_page_, page_padding, 12, content_width, 138, UiText(zh, L"History", L"历史记录"));
+      create_label(settings_storage_page_, page_padding + 16, 52, 110, 18, UiText(zh, L"History limit", L"历史条数"));
+      create_combo(settings_storage_page_, settings_history_limit_combo_, page_padding + 132, 48, 180);
+      create_label(settings_storage_page_, page_padding + 16, 88, 110, 18, UiText(zh, L"Sort order", L"排序方式"));
+      create_combo(settings_storage_page_, settings_sort_order_combo_, page_padding + 132, 84, 180);
 
-      create_group(settings_storage_page_, page_padding, 150, content_width, 174, UiText(zh, L"Saved content types", L"保存的内容类型"));
-      int storage_y = 176;
+      create_card(settings_storage_page_, page_padding, 162, content_width, 188, UiText(zh, L"Saved content types", L"保存的内容类型"));
+      int storage_y = 198;
       create_checkbox(
           settings_storage_page_,
           settings_capture_text_check_,
@@ -604,8 +744,8 @@ LRESULT Win32App::HandleSettingsWindowMessage(HWND window, UINT message, WPARAM 
           content_width - 32,
           UiText(zh, L"Save file lists", L"保存文件列表"));
 
-      create_group(settings_appearance_page_, page_padding, 12, content_width, 118, UiText(zh, L"Popup", L"弹窗"));
-      int appearance_y = 38;
+      create_card(settings_appearance_page_, page_padding, 12, content_width, 132, UiText(zh, L"Popup", L"弹窗"));
+      int appearance_y = 48;
       create_checkbox(
           settings_appearance_page_,
           settings_show_search_check_,
@@ -630,47 +770,48 @@ LRESULT Win32App::HandleSettingsWindowMessage(HWND window, UINT message, WPARAM 
           content_width - 32,
           UiText(zh, L"Remember popup position", L"记住弹窗位置"));
 
-      create_group(settings_appearance_page_, page_padding, 142, content_width, 86, UiText(zh, L"Pins", L"置顶"));
-      create_label(settings_appearance_page_, page_padding + 16, 170, 110, 18, UiText(zh, L"Pin position", L"置顶位置"));
-      create_combo(settings_appearance_page_, settings_pin_position_combo_, page_padding + 132, 166, 180);
+      create_card(settings_appearance_page_, page_padding, 184, content_width, 96, UiText(zh, L"Pins", L"置顶"));
+      create_label(settings_appearance_page_, page_padding + 16, 224, 110, 18, UiText(zh, L"Pin position", L"置顶位置"));
+      create_combo(settings_appearance_page_, settings_pin_position_combo_, page_padding + 132, 220, 180);
 
-      create_group(settings_pins_page_, page_padding, 12, content_width, 170, UiText(zh, L"Pinned items", L"置顶项目"));
+      create_card(settings_pins_page_, page_padding, 12, content_width, 182, UiText(zh, L"Pinned items", L"置顶项目"));
       create_label(
           settings_pins_page_,
           page_padding + 16,
-          40,
+          52,
           content_width - 32,
           20,
-          UiText(zh, L"Windows pin management is available directly from the history popup.", L"Windows 版的置顶管理可直接在历史弹窗中完成。"));
-      create_label(settings_pins_page_, page_padding + 16, 74, content_width - 32, 18, UiText(zh, L"Use Ctrl+P to pin or unpin the selected item.", L"按 Ctrl+P 可置顶或取消置顶当前选中项。"));
-      create_label(settings_pins_page_, page_padding + 16, 98, content_width - 32, 18, UiText(zh, L"Use Ctrl+R to rename a pinned item.", L"按 Ctrl+R 可重命名置顶项。"));
-      create_label(settings_pins_page_, page_padding + 16, 122, content_width - 32, 18, UiText(zh, L"Use Ctrl+E to edit pinned plain text.", L"按 Ctrl+E 可编辑置顶的纯文本内容。"));
+          UiText(zh, L"Windows pin management is available directly from the history popup.", L"Windows 版的置顶管理可直接在历史弹窗中完成。"),
+          SettingsTextRole::kHint);
+      create_label(settings_pins_page_, page_padding + 16, 86, content_width - 32, 18, UiText(zh, L"Use Ctrl+P to pin or unpin the selected item.", L"按 Ctrl+P 可置顶或取消置顶当前选中项。"));
+      create_label(settings_pins_page_, page_padding + 16, 114, content_width - 32, 18, UiText(zh, L"Use Ctrl+R to rename a pinned item.", L"按 Ctrl+R 可重命名置顶项。"));
+      create_label(settings_pins_page_, page_padding + 16, 142, content_width - 32, 18, UiText(zh, L"Use Ctrl+E to edit pinned plain text.", L"按 Ctrl+E 可编辑置顶的纯文本内容。"));
 
-      create_group(settings_ignore_page_, page_padding, 12, content_width, 84, UiText(zh, L"Ignore behavior", L"忽略行为"));
+      create_card(settings_ignore_page_, page_padding, 12, content_width, 96, UiText(zh, L"Ignore behavior", L"忽略行为"));
       create_checkbox(
           settings_ignore_page_,
           settings_ignore_all_check_,
           page_padding + 16,
-          38,
+          48,
           content_width - 32,
           UiText(zh, L"Ignore all clipboard captures", L"忽略所有剪贴板捕获"));
       create_checkbox(
           settings_ignore_page_,
           settings_only_listed_apps_check_,
           page_padding + 16,
-          62,
+          74,
           content_width - 32,
           UiText(zh, L"Only capture applications listed in the allowed applications box", L"仅捕获“允许的应用程序”列表中列出的应用"));
 
       const int ignore_column_gap = 12;
       const int ignore_column_width = (content_width - ignore_column_gap) / 2;
       const int ignore_edit_height = 132;
-      create_group(settings_ignore_page_, page_padding, 108, content_width, page_height - 120, UiText(zh, L"Rules", L"规则"));
+      create_card(settings_ignore_page_, page_padding, 120, content_width, page_height - 132, UiText(zh, L"Rules", L"规则"));
 
       create_label(
           settings_ignore_page_,
           page_padding + 16,
-          134,
+          158,
           ignore_column_width - 8,
           18,
           UiText(zh, L"Ignored applications", L"忽略的应用程序"));
@@ -678,14 +819,14 @@ LRESULT Win32App::HandleSettingsWindowMessage(HWND window, UINT message, WPARAM 
           settings_ignore_page_,
           settings_ignored_apps_edit_,
           page_padding + 16,
-          156,
+          182,
           ignore_column_width - 8,
           ignore_edit_height);
 
       create_label(
           settings_ignore_page_,
           page_padding + ignore_column_width + ignore_column_gap + 8,
-          134,
+          158,
           ignore_column_width - 8,
           18,
           UiText(zh, L"Allowed applications", L"允许的应用程序"));
@@ -693,14 +834,14 @@ LRESULT Win32App::HandleSettingsWindowMessage(HWND window, UINT message, WPARAM 
           settings_ignore_page_,
           settings_allowed_apps_edit_,
           page_padding + ignore_column_width + ignore_column_gap + 8,
-          156,
+          182,
           ignore_column_width - 8,
           ignore_edit_height);
 
       create_label(
           settings_ignore_page_,
           page_padding + 16,
-          300,
+          334,
           ignore_column_width - 8,
           18,
           UiText(zh, L"Ignored text patterns", L"忽略的文本模式"));
@@ -708,14 +849,14 @@ LRESULT Win32App::HandleSettingsWindowMessage(HWND window, UINT message, WPARAM 
           settings_ignore_page_,
           settings_ignored_patterns_edit_,
           page_padding + 16,
-          322,
+          358,
           ignore_column_width - 8,
           ignore_edit_height);
 
       create_label(
           settings_ignore_page_,
           page_padding + ignore_column_width + ignore_column_gap + 8,
-          300,
+          334,
           ignore_column_width - 8,
           18,
           UiText(zh, L"Ignored content formats", L"忽略的内容格式"));
@@ -723,41 +864,43 @@ LRESULT Win32App::HandleSettingsWindowMessage(HWND window, UINT message, WPARAM 
           settings_ignore_page_,
           settings_ignored_formats_edit_,
           page_padding + ignore_column_width + ignore_column_gap + 8,
-          322,
+          358,
           ignore_column_width - 8,
           ignore_edit_height);
 
-      create_group(settings_advanced_page_, page_padding, 12, content_width, 92, UiText(zh, L"Advanced", L"高级"));
+      create_card(settings_advanced_page_, page_padding, 12, content_width, 102, UiText(zh, L"Advanced", L"高级"));
       create_checkbox(
           settings_advanced_page_,
           settings_clear_history_on_exit_check_,
           page_padding + 16,
-          38,
+          48,
           content_width - 32,
           UiText(zh, L"Clear unpinned history when the app exits", L"应用退出时清除未置顶历史记录"));
       create_checkbox(
           settings_advanced_page_,
           settings_clear_clipboard_on_exit_check_,
           page_padding + 16,
-          62,
+          74,
           content_width - 32,
           UiText(zh, L"Clear the Windows clipboard when the app exits", L"应用退出时清空 Windows 剪贴板"));
 
-      create_group(settings_advanced_page_, page_padding, 118, content_width, 110, UiText(zh, L"Notes", L"说明"));
+      create_card(settings_advanced_page_, page_padding, 126, content_width, 124, UiText(zh, L"Notes", L"说明"));
       create_label(
           settings_advanced_page_,
           page_padding + 16,
-          146,
+          166,
           content_width - 32,
           20,
-          UiText(zh, L"These options match the source project's advanced housekeeping behavior.", L"这些选项对应源项目中的高级清理行为。"));
+          UiText(zh, L"These options match the source project's advanced housekeeping behavior.", L"这些选项对应源项目中的高级清理行为。"),
+          SettingsTextRole::kHint);
       create_label(
           settings_advanced_page_,
           page_padding + 16,
-          170,
+          194,
           content_width - 32,
           36,
-          UiText(zh, L"History clearing keeps pinned items. Clipboard clearing removes the current clipboard contents on shutdown.", L"清理历史记录时会保留置顶项。清空剪贴板会在退出时移除当前系统剪贴板内容。"));
+          UiText(zh, L"History clearing keeps pinned items. Clipboard clearing removes the current clipboard contents on shutdown.", L"清理历史记录时会保留置顶项。清空剪贴板会在退出时移除当前系统剪贴板内容。"),
+          SettingsTextRole::kHint);
 
       for (const auto& choice : kPopupHotKeyChoices) {
         AddComboItem(settings_hotkey_key_combo_, PopupHotKeyLabel(zh, choice.virtual_key));
@@ -789,7 +932,7 @@ LRESULT Win32App::HandleSettingsWindowMessage(HWND window, UINT message, WPARAM 
           reinterpret_cast<HMENU>(static_cast<INT_PTR>(kSettingsSaveButtonId)),
           instance_,
           nullptr);
-      apply_font(save_button);
+      apply_font(save_button, semibold_font);
 
       HWND apply_button = CreateWindowExW(
           0,
@@ -804,7 +947,7 @@ LRESULT Win32App::HandleSettingsWindowMessage(HWND window, UINT message, WPARAM 
           reinterpret_cast<HMENU>(static_cast<INT_PTR>(kSettingsApplyButtonId)),
           instance_,
           nullptr);
-      apply_font(apply_button);
+      apply_font(apply_button, body_font);
 
       HWND close_button = CreateWindowExW(
           0,
@@ -819,7 +962,7 @@ LRESULT Win32App::HandleSettingsWindowMessage(HWND window, UINT message, WPARAM 
           reinterpret_cast<HMENU>(static_cast<INT_PTR>(kSettingsCloseButtonId)),
           instance_,
           nullptr);
-      apply_font(close_button);
+      apply_font(close_button, body_font);
 
       if (settings_double_click_modifier_input_ != nullptr) {
         SetWindowLongPtrW(settings_double_click_modifier_input_, GWLP_USERDATA, reinterpret_cast<LONG_PTR>(this));
@@ -833,6 +976,49 @@ LRESULT Win32App::HandleSettingsWindowMessage(HWND window, UINT message, WPARAM 
       ShowSettingsPage(0);
       SyncSettingsWindowControls();
       return 0;
+    }
+    case WM_ERASEBKGND:
+      return 1;
+    case WM_PAINT: {
+      PAINTSTRUCT paint{};
+      HDC dc = BeginPaint(window, &paint);
+      RECT client_rect{};
+      GetClientRect(window, &client_rect);
+      FillRect(
+          dc,
+          &client_rect,
+          settings_window_background_brush_ != nullptr
+              ? settings_window_background_brush_
+              : static_cast<HBRUSH>(GetStockObject(WHITE_BRUSH)));
+
+      RECT divider{
+          kSettingsOuterPadding,
+          kSettingsClientHeight - kSettingsOuterPadding - 40,
+          kSettingsClientWidth - kSettingsOuterPadding,
+          kSettingsClientHeight - kSettingsOuterPadding - 39,
+      };
+      FillRect(
+          dc,
+          &divider,
+          settings_card_brush_ != nullptr
+              ? settings_card_brush_
+              : static_cast<HBRUSH>(GetStockObject(WHITE_BRUSH)));
+      EndPaint(window, &paint);
+      return 0;
+    }
+    case WM_CTLCOLORSTATIC: {
+      HDC dc = reinterpret_cast<HDC>(wparam);
+      const HWND control = reinterpret_cast<HWND>(lparam);
+      SetBkMode(dc, TRANSPARENT);
+      if (control == settings_header_title_) {
+        SetTextColor(dc, kSettingsPrimaryText);
+      } else if (control == settings_header_subtitle_) {
+        SetTextColor(dc, kSettingsHintText);
+      }
+      return reinterpret_cast<INT_PTR>(
+          settings_window_background_brush_ != nullptr
+              ? settings_window_background_brush_
+              : static_cast<HBRUSH>(GetStockObject(WHITE_BRUSH)));
     }
     case WM_NOTIFY: {
       const auto* header = reinterpret_cast<const NMHDR*>(lparam);
@@ -875,6 +1061,8 @@ LRESULT Win32App::HandleSettingsWindowMessage(HWND window, UINT message, WPARAM 
       if (settings_window_ == window) {
         settings_window_ = nullptr;
       }
+      settings_header_title_ = nullptr;
+      settings_header_subtitle_ = nullptr;
       settings_tab_ = nullptr;
       settings_general_page_ = nullptr;
       settings_storage_page_ = nullptr;
@@ -914,10 +1102,139 @@ LRESULT Win32App::HandleSettingsWindowMessage(HWND window, UINT message, WPARAM 
       settings_allowed_apps_edit_ = nullptr;
       settings_ignored_patterns_edit_ = nullptr;
       settings_ignored_formats_edit_ = nullptr;
+      settings_text_elements_.clear();
+      settings_sections_.clear();
+      if (settings_ui_font_ != nullptr) {
+        DeleteObject(settings_ui_font_);
+        settings_ui_font_ = nullptr;
+      }
+      if (settings_ui_semibold_font_ != nullptr) {
+        DeleteObject(settings_ui_semibold_font_);
+        settings_ui_semibold_font_ = nullptr;
+      }
+      if (settings_ui_title_font_ != nullptr) {
+        DeleteObject(settings_ui_title_font_);
+        settings_ui_title_font_ = nullptr;
+      }
+      if (settings_window_background_brush_ != nullptr) {
+        DeleteObject(settings_window_background_brush_);
+        settings_window_background_brush_ = nullptr;
+      }
+      if (settings_card_brush_ != nullptr) {
+        DeleteObject(settings_card_brush_);
+        settings_card_brush_ = nullptr;
+      }
+      if (settings_input_brush_ != nullptr) {
+        DeleteObject(settings_input_brush_);
+        settings_input_brush_ = nullptr;
+      }
+      if (settings_card_border_pen_ != nullptr) {
+        DeleteObject(settings_card_border_pen_);
+        settings_card_border_pen_ = nullptr;
+      }
+      original_settings_page_proc_ = nullptr;
       original_settings_double_click_modifier_proc_ = nullptr;
       return 0;
     default:
       break;
+  }
+
+  return DefWindowProcW(window, message, wparam, lparam);
+}
+
+LRESULT Win32App::HandleSettingsPageMessage(HWND window, UINT message, WPARAM wparam, LPARAM lparam) {
+  switch (message) {
+    case WM_ERASEBKGND:
+      return 1;
+    case WM_PAINT: {
+      PAINTSTRUCT paint{};
+      HDC dc = BeginPaint(window, &paint);
+
+      RECT client_rect{};
+      GetClientRect(window, &client_rect);
+      FillRect(
+          dc,
+          &client_rect,
+          settings_window_background_brush_ != nullptr
+              ? settings_window_background_brush_
+              : static_cast<HBRUSH>(GetStockObject(WHITE_BRUSH)));
+
+      if (settings_card_brush_ != nullptr && settings_card_border_pen_ != nullptr) {
+        const HGDIOBJ old_brush = SelectObject(dc, settings_card_brush_);
+        const HGDIOBJ old_pen = SelectObject(dc, settings_card_border_pen_);
+        for (const auto& section : settings_sections_) {
+          if (section.page != window) {
+            continue;
+          }
+
+          RoundRect(
+              dc,
+              section.rect.left,
+              section.rect.top,
+              section.rect.right,
+              section.rect.bottom,
+              kSettingsCardRadius,
+              kSettingsCardRadius);
+        }
+        SelectObject(dc, old_pen);
+        SelectObject(dc, old_brush);
+      }
+
+      EndPaint(window, &paint);
+      return 0;
+    }
+    case WM_CTLCOLORSTATIC: {
+      HDC dc = reinterpret_cast<HDC>(wparam);
+      const HWND control = reinterpret_cast<HWND>(lparam);
+      SetBkMode(dc, TRANSPARENT);
+      COLORREF text_color = kSettingsPrimaryText;
+      for (const auto& text_element : settings_text_elements_) {
+        if (text_element.handle != control) {
+          continue;
+        }
+
+        switch (text_element.role) {
+          case SettingsTextRole::kSectionTitle:
+            text_color = kSettingsAccentText;
+            break;
+          case SettingsTextRole::kHint:
+            text_color = kSettingsHintText;
+            break;
+          case SettingsTextRole::kBody:
+          default:
+            text_color = kSettingsPrimaryText;
+            break;
+        }
+        break;
+      }
+      SetTextColor(dc, text_color);
+      return reinterpret_cast<INT_PTR>(GetStockObject(NULL_BRUSH));
+    }
+    case WM_CTLCOLOREDIT:
+    case WM_CTLCOLORLISTBOX: {
+      HDC dc = reinterpret_cast<HDC>(wparam);
+      SetTextColor(dc, kSettingsPrimaryText);
+      SetBkColor(dc, kSettingsInputBackground);
+      return reinterpret_cast<INT_PTR>(
+          settings_input_brush_ != nullptr
+              ? settings_input_brush_
+              : static_cast<HBRUSH>(GetStockObject(WHITE_BRUSH)));
+    }
+    case WM_CTLCOLORBTN: {
+      HDC dc = reinterpret_cast<HDC>(wparam);
+      SetBkMode(dc, TRANSPARENT);
+      SetTextColor(dc, kSettingsPrimaryText);
+      return reinterpret_cast<INT_PTR>(
+          settings_card_brush_ != nullptr
+              ? settings_card_brush_
+              : static_cast<HBRUSH>(GetStockObject(WHITE_BRUSH)));
+    }
+    default:
+      break;
+  }
+
+  if (original_settings_page_proc_ != nullptr) {
+    return CallWindowProcW(original_settings_page_proc_, window, message, wparam, lparam);
   }
 
   return DefWindowProcW(window, message, wparam, lparam);

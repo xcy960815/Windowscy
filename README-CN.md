@@ -115,5 +115,7 @@ ctest --test-dir build -C Release --output-on-failure
 - `README.md`
 - `docs/tech-stack-decision.md`
 - `docs/ui-upgrade-options.md`
+- `docs/ui-upgrade-tasklist.md`
+- `docs/winui3-settings-poc.md`
 - `docs/win32-app-split-todolist.md`
 - `docs/github-actions-windows-build-notes.md`

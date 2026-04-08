@@ -85,3 +85,7 @@
 2. 并行做阶段 2 的最小 PoC（仅 General 页）
 3. 用 PoC 结果决定是否全面转入 WinUI 3
 
+## 补充文档
+
+- `docs/ui-upgrade-tasklist.md`
+- `docs/winui3-settings-poc.md`

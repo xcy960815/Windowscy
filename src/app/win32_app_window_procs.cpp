@@ -76,6 +76,14 @@ LRESULT CALLBACK Win32App::StaticSettingsWindowProc(HWND window, UINT message, W
   return DefWindowProcW(window, message, wparam, lparam);
 }
 
+LRESULT CALLBACK Win32App::StaticSettingsPageProc(HWND window, UINT message, WPARAM wparam, LPARAM lparam) {
+  if (auto* self = FromWindowUserData(window); self != nullptr) {
+    return self->HandleSettingsPageMessage(window, message, wparam, lparam);
+  }
+
+  return DefWindowProcW(window, message, wparam, lparam);
+}
+
 LRESULT CALLBACK Win32App::StaticSettingsDoubleClickModifierProc(HWND window, UINT message, WPARAM wparam, LPARAM lparam) {
   if (auto* self = FromWindowUserData(window); self != nullptr) {
     return self->HandleSettingsDoubleClickModifierMessage(window, message, wparam, lparam);

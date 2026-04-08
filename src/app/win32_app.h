@@ -70,9 +70,9 @@ class Win32App {
   static constexpr UINT kMenuHistoryLimit200 = 1052;         /**< 历史限制 200 菜单 ID */
   static constexpr UINT kMenuHistoryLimit500 = 1053;         /**< 历史限制 500 菜单 ID */
   static constexpr UINT kMenuExit = 1099;                     /**< 退出菜单 ID */
-  static constexpr int kSearchEditHeight = 28;               /**< 搜索编辑框高度 */
-  static constexpr int kPopupPadding = 8;                    /**< 弹窗内边距 */
-  static constexpr int kPreviewMinWidth = 200;              /**< 预览最小宽度 */
+  static constexpr int kSearchEditHeight = 40;               /**< 搜索编辑框高度 */
+  static constexpr int kPopupPadding = 12;                   /**< 弹窗内边距 */
+  static constexpr int kPreviewMinWidth = 180;               /**< 预览最小宽度 */
   static constexpr int kPinEditorEditControlId = 2001;       /**< 固定编辑器编辑控件 ID */
   static constexpr int kPinEditorSaveButtonId = 2002;         /**< 固定编辑器保存按钮 ID */
   static constexpr int kPinEditorCancelButtonId = 2003;       /**< 固定编辑器取消按钮 ID */
@@ -460,6 +460,16 @@ class Win32App {
   LRESULT HandleSettingsWindowMessage(HWND window, UINT message, WPARAM wparam, LPARAM lparam);
 
   /**
+   * @brief 处理设置页面容器消息
+   * @param window 页面窗口句柄
+   * @param message 消息
+   * @param wparam 宽参数
+   * @param lparam 长参数
+   * @return LRESULT 消息处理结果
+   */
+  LRESULT HandleSettingsPageMessage(HWND window, UINT message, WPARAM wparam, LPARAM lparam);
+
+  /**
    * @brief 处理设置双击修饰符消息
    * @param window 窗口句柄
    * @param message 消息
@@ -502,6 +512,11 @@ class Win32App {
   static LRESULT CALLBACK StaticSettingsWindowProc(HWND window, UINT message, WPARAM wparam, LPARAM lparam);
 
   /**
+   * @brief 设置页面静态过程
+   */
+  static LRESULT CALLBACK StaticSettingsPageProc(HWND window, UINT message, WPARAM wparam, LPARAM lparam);
+
+  /**
    * @brief 设置双击修饰符静态过程
    */
   static LRESULT CALLBACK StaticSettingsDoubleClickModifierProc(HWND window, UINT message, WPARAM wparam, LPARAM lparam);
@@ -518,6 +533,22 @@ class Win32App {
    */
   static Win32App* FromWindowUserData(HWND window);
 
+  enum class SettingsTextRole {
+    kBody,
+    kHint,
+    kSectionTitle,
+  };
+
+  struct SettingsTextElement {
+    HWND handle = nullptr;
+    SettingsTextRole role = SettingsTextRole::kBody;
+  };
+
+  struct SettingsSection {
+    HWND page = nullptr;
+    RECT rect{};
+  };
+
   // ========== 成员变量 ==========
 
   HINSTANCE instance_ = nullptr;                                          /**< 应用程序实例 */
@@ -529,6 +560,8 @@ class Win32App {
   HWND pin_editor_window_ = nullptr;                                       /**< 固定编辑器窗口句柄 */
   HWND pin_editor_edit_ = nullptr;                                        /**< 固定编辑器编辑框句柄 */
   HWND settings_window_ = nullptr;                                         /**< 设置窗口句柄 */
+  HWND settings_header_title_ = nullptr;                                   /**< 设置页标题句柄 */
+  HWND settings_header_subtitle_ = nullptr;                                /**< 设置页副标题句柄 */
   HWND settings_tab_ = nullptr;                                           /**< 设置标签页句柄 */
   HWND settings_general_page_ = nullptr;                                   /**< 设置常规页面句柄 */
   HWND settings_storage_page_ = nullptr;                                  /**< 设置存储页面句柄 */
@@ -571,7 +604,21 @@ class Win32App {
   HANDLE single_instance_mutex_ = nullptr;                                 /**< 单实例互斥体 */
   WNDPROC original_search_edit_proc_ = nullptr;                           /**< 原始搜索编辑过程 */
   WNDPROC original_list_box_proc_ = nullptr;                              /**< 原始列表框过程 */
+  WNDPROC original_settings_page_proc_ = nullptr;                          /**< 原始设置页面过程 */
   WNDPROC original_settings_double_click_modifier_proc_ = nullptr;         /**< 原始设置双击修饰符过程 */
+  HFONT popup_ui_font_ = nullptr;                                          /**< 主弹窗正文字体 */
+  HFONT popup_ui_emphasis_font_ = nullptr;                                 /**< 主弹窗强调字体 */
+  HBRUSH popup_window_background_brush_ = nullptr;                         /**< 主弹窗背景画刷 */
+  HBRUSH popup_surface_brush_ = nullptr;                                   /**< 主弹窗卡片画刷 */
+  HBRUSH popup_input_brush_ = nullptr;                                     /**< 主弹窗输入画刷 */
+  HPEN popup_surface_border_pen_ = nullptr;                                /**< 主弹窗卡片描边画笔 */
+  HFONT settings_ui_font_ = nullptr;                                       /**< 设置页正文字体 */
+  HFONT settings_ui_semibold_font_ = nullptr;                              /**< 设置页强调字体 */
+  HFONT settings_ui_title_font_ = nullptr;                                 /**< 设置页标题字体 */
+  HBRUSH settings_window_background_brush_ = nullptr;                      /**< 设置页背景画刷 */
+  HBRUSH settings_card_brush_ = nullptr;                                   /**< 设置卡片画刷 */
+  HBRUSH settings_input_brush_ = nullptr;                                  /**< 输入控件画刷 */
+  HPEN settings_card_border_pen_ = nullptr;                                /**< 设置卡片描边画笔 */
   HHOOK double_click_hook_ = nullptr;                                       /**< 双击钩子句柄 */
   UINT taskbar_created_message_ = 0;                                       /**< 任务栏创建消息 */
   bool toggle_hotkey_registered_ = false;                                  /**< 切换热键是否已注册 */
@@ -582,10 +629,15 @@ class Win32App {
   HWND previous_foreground_window_ = nullptr;                            /**< 前一个前台窗口 */
   std::string search_query_;                                              /**< 搜索查询字符串 */
   std::vector<std::uint64_t> visible_item_ids_;                            /**< 可见项 ID 列表 */
+  RECT popup_search_card_rect_{};
+  RECT popup_list_card_rect_{};
+  RECT popup_preview_card_rect_{};
   std::filesystem::path history_path_;                                     /**< 历史记录路径 */
   std::filesystem::path settings_path_;                                   /**< 设置路径 */
   AppSettings settings_;                                                  /**< 应用程序设置 */
   HistoryStore store_;                                                    /**< 历史记录存储 */
+  std::vector<SettingsTextElement> settings_text_elements_;                /**< 设置文本样式角色 */
+  std::vector<SettingsSection> settings_sections_;                         /**< 设置页卡片区域 */
   DoubleClickModifierKeyDetector double_click_modifier_detector_;         /**< 双击修饰符检测器 */
   DoubleClickModifierKey settings_double_click_modifier_selection_ = DoubleClickModifierKey::kNone; /**< 设置中的双击修饰符选择 */
   std::uint64_t pin_editor_item_id_ = 0;                                 /**< 固定编辑器项 ID */

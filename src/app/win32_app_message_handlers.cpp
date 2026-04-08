@@ -4,6 +4,19 @@
 
 namespace maccy {
 
+namespace {
+
+constexpr COLORREF kPopupWindowBackground = RGB(246, 248, 252);
+constexpr COLORREF kPopupSurfaceBackground = RGB(255, 255, 255);
+constexpr COLORREF kPopupSurfaceBorder = RGB(220, 226, 236);
+constexpr COLORREF kPopupInputBackground = RGB(255, 255, 255);
+constexpr COLORREF kPopupPrimaryText = RGB(26, 31, 43);
+constexpr int kPopupOuterPadding = 14;
+constexpr int kPopupCardInset = 8;
+constexpr int kPopupCardRadius = 14;
+
+}  // namespace
+
 LRESULT Win32App::HandleControllerMessage(HWND window, UINT message, WPARAM wparam, LPARAM lparam) {
   if (message == taskbar_created_message_) {
     SetupTrayIcon();
@@ -56,10 +69,54 @@ LRESULT Win32App::HandleControllerMessage(HWND window, UINT message, WPARAM wpar
 LRESULT Win32App::HandlePopupMessage(HWND window, UINT message, WPARAM wparam, LPARAM lparam) {
   switch (message) {
     case WM_CREATE: {
+      HDC window_dc = GetDC(window);
+      const int dpi = window_dc != nullptr ? GetDeviceCaps(window_dc, LOGPIXELSY) : 96;
+      if (window_dc != nullptr) {
+        ReleaseDC(window, window_dc);
+      }
+
+      const auto create_font = [dpi](int point_size, int weight) {
+        return CreateFontW(
+            -MulDiv(point_size, dpi, 72),
+            0,
+            0,
+            0,
+            weight,
+            FALSE,
+            FALSE,
+            FALSE,
+            DEFAULT_CHARSET,
+            OUT_DEFAULT_PRECIS,
+            CLIP_DEFAULT_PRECIS,
+            CLEARTYPE_QUALITY,
+            DEFAULT_PITCH | FF_DONTCARE,
+            L"Segoe UI");
+      };
+
       const HFONT default_font = static_cast<HFONT>(GetStockObject(DEFAULT_GUI_FONT));
+      if (popup_ui_font_ == nullptr) {
+        popup_ui_font_ = create_font(10, FW_NORMAL);
+      }
+      if (popup_ui_emphasis_font_ == nullptr) {
+        popup_ui_emphasis_font_ = create_font(10, FW_SEMIBOLD);
+      }
+      if (popup_window_background_brush_ == nullptr) {
+        popup_window_background_brush_ = CreateSolidBrush(kPopupWindowBackground);
+      }
+      if (popup_surface_brush_ == nullptr) {
+        popup_surface_brush_ = CreateSolidBrush(kPopupSurfaceBackground);
+      }
+      if (popup_input_brush_ == nullptr) {
+        popup_input_brush_ = CreateSolidBrush(kPopupInputBackground);
+      }
+      if (popup_surface_border_pen_ == nullptr) {
+        popup_surface_border_pen_ = CreatePen(PS_SOLID, 1, kPopupSurfaceBorder);
+      }
+
+      const HFONT body_font = popup_ui_font_ != nullptr ? popup_ui_font_ : default_font;
 
       search_edit_ = CreateWindowExW(
-          WS_EX_CLIENTEDGE,
+          0,
           L"EDIT",
           nullptr,
           WS_CHILD | WS_VISIBLE | WS_TABSTOP | ES_AUTOHSCROLL,
@@ -73,7 +130,7 @@ LRESULT Win32App::HandlePopupMessage(HWND window, UINT message, WPARAM wparam, L
           nullptr);
 
       list_box_ = CreateWindowExW(
-          WS_EX_CLIENTEDGE,
+          0,
           L"LISTBOX",
           nullptr,
           WS_CHILD | WS_VISIBLE | WS_TABSTOP | WS_VSCROLL | LBS_NOTIFY | LBS_NOINTEGRALHEIGHT |
@@ -88,7 +145,7 @@ LRESULT Win32App::HandlePopupMessage(HWND window, UINT message, WPARAM wparam, L
           nullptr);
 
       preview_edit_ = CreateWindowExW(
-          WS_EX_CLIENTEDGE,
+          0,
           L"EDIT",
           nullptr,
           WS_CHILD | WS_VISIBLE | ES_MULTILINE | ES_AUTOVSCROLL | ES_READONLY | WS_VSCROLL,
@@ -102,59 +159,127 @@ LRESULT Win32App::HandlePopupMessage(HWND window, UINT message, WPARAM wparam, L
           nullptr);
 
       if (search_edit_ != nullptr) {
-        SendMessageW(search_edit_, WM_SETFONT, reinterpret_cast<WPARAM>(default_font), TRUE);
+        SendMessageW(search_edit_, WM_SETFONT, reinterpret_cast<WPARAM>(body_font), TRUE);
+        SendMessageW(search_edit_, EM_SETMARGINS, EC_LEFTMARGIN | EC_RIGHTMARGIN, MAKELPARAM(12, 12));
+        SendMessageW(
+            search_edit_,
+            EM_SETCUEBANNER,
+            0,
+            reinterpret_cast<LPARAM>(UiText(
+                use_chinese_ui_,
+                L"Search clipboard history, source apps, or pinned items",
+                L"搜索剪贴板历史、来源应用或置顶项目")));
         SetWindowLongPtrW(search_edit_, GWLP_USERDATA, reinterpret_cast<LONG_PTR>(this));
         original_search_edit_proc_ = reinterpret_cast<WNDPROC>(
             SetWindowLongPtrW(search_edit_, GWLP_WNDPROC, reinterpret_cast<LONG_PTR>(StaticSearchEditProc)));
       }
 
       if (list_box_ != nullptr) {
-        SendMessageW(list_box_, WM_SETFONT, reinterpret_cast<WPARAM>(default_font), TRUE);
+        SendMessageW(list_box_, WM_SETFONT, reinterpret_cast<WPARAM>(body_font), TRUE);
         SetWindowLongPtrW(list_box_, GWLP_USERDATA, reinterpret_cast<LONG_PTR>(this));
         original_list_box_proc_ = reinterpret_cast<WNDPROC>(
             SetWindowLongPtrW(list_box_, GWLP_WNDPROC, reinterpret_cast<LONG_PTR>(StaticListBoxWindowProc)));
       }
 
       if (preview_edit_ != nullptr) {
-        SendMessageW(preview_edit_, WM_SETFONT, reinterpret_cast<WPARAM>(default_font), TRUE);
+        SendMessageW(preview_edit_, WM_SETFONT, reinterpret_cast<WPARAM>(body_font), TRUE);
+        SendMessageW(preview_edit_, EM_SETMARGINS, EC_LEFTMARGIN | EC_RIGHTMARGIN, MAKELPARAM(12, 12));
       }
       return 0;
     }
     case WM_SIZE: {
       const int client_width = LOWORD(lparam);
       const int client_height = HIWORD(lparam);
-      const int search_height = settings_.popup.show_search ? kSearchEditHeight : 0;
-      const int content_top = search_height + (settings_.popup.show_search ? kPopupPadding : 0);
-      const int content_height = std::max(0, client_height - content_top);
+      const int outer_padding = kPopupOuterPadding;
+      const int card_inset = kPopupCardInset;
+      const bool show_search = settings_.popup.show_search && search_edit_ != nullptr;
+      const int available_width = std::max(0, client_width - outer_padding * 2);
+      const int search_card_height = show_search ? (kSearchEditHeight + 16) : 0;
+      const int search_card_bottom = outer_padding + search_card_height;
+      const int content_top = show_search ? (search_card_bottom + kPopupPadding) : outer_padding;
+      const int content_height = std::max(0, client_height - content_top - outer_padding);
+
+      popup_search_card_rect_ = RECT{0, 0, 0, 0};
+      popup_list_card_rect_ = RECT{0, 0, 0, 0};
+      popup_preview_card_rect_ = RECT{0, 0, 0, 0};
+
+      if (show_search) {
+        popup_search_card_rect_ = RECT{
+            outer_padding,
+            outer_padding,
+            outer_padding + available_width,
+            search_card_bottom,
+        };
+      }
 
       if (search_edit_ != nullptr) {
-        ShowWindow(search_edit_, settings_.popup.show_search ? SW_SHOW : SW_HIDE);
-        MoveWindow(search_edit_, 0, 0, client_width, kSearchEditHeight, TRUE);
+        ShowWindow(search_edit_, show_search ? SW_SHOW : SW_HIDE);
+        if (show_search) {
+          MoveWindow(
+              search_edit_,
+              popup_search_card_rect_.left + card_inset,
+              popup_search_card_rect_.top + 8,
+              std::max(120, available_width - card_inset * 2),
+              kSearchEditHeight,
+              TRUE);
+        }
       }
 
       if (list_box_ != nullptr) {
         if (settings_.popup.show_preview && preview_edit_ != nullptr) {
+          const int minimum_list_width = 200;
           const int preview_width = std::clamp(
               settings_.popup.preview_width,
               kPreviewMinWidth,
-              std::max(kPreviewMinWidth, client_width - 220));
-          const int list_width = std::max(220, client_width - preview_width - kPopupPadding);
-          MoveWindow(list_box_, 0, content_top, list_width, content_height, TRUE);
+              std::max(kPreviewMinWidth, available_width - minimum_list_width - kPopupPadding));
+          const int list_width = std::max(minimum_list_width, available_width - preview_width - kPopupPadding);
+          popup_list_card_rect_ = RECT{
+              outer_padding,
+              content_top,
+              outer_padding + list_width,
+              content_top + content_height,
+          };
+          popup_preview_card_rect_ = RECT{
+              popup_list_card_rect_.right + kPopupPadding,
+              content_top,
+              outer_padding + available_width,
+              content_top + content_height,
+          };
+          MoveWindow(
+              list_box_,
+              popup_list_card_rect_.left + card_inset,
+              popup_list_card_rect_.top + card_inset,
+              std::max(180, list_width - card_inset * 2),
+              std::max(120, content_height - card_inset * 2),
+              TRUE);
           MoveWindow(
               preview_edit_,
-              list_width + kPopupPadding,
-              content_top,
-              std::max(0, client_width - list_width - kPopupPadding),
-              content_height,
+              popup_preview_card_rect_.left + card_inset,
+              popup_preview_card_rect_.top + card_inset,
+              std::max(120, popup_preview_card_rect_.right - popup_preview_card_rect_.left - card_inset * 2),
+              std::max(120, content_height - card_inset * 2),
               TRUE);
           ShowWindow(preview_edit_, SW_SHOW);
         } else {
-          MoveWindow(list_box_, 0, content_top, client_width, content_height, TRUE);
+          popup_list_card_rect_ = RECT{
+              outer_padding,
+              content_top,
+              outer_padding + available_width,
+              content_top + content_height,
+          };
+          MoveWindow(
+              list_box_,
+              popup_list_card_rect_.left + card_inset,
+              popup_list_card_rect_.top + card_inset,
+              std::max(220, available_width - card_inset * 2),
+              std::max(120, content_height - card_inset * 2),
+              TRUE);
           if (preview_edit_ != nullptr) {
             ShowWindow(preview_edit_, SW_HIDE);
           }
         }
       }
+      InvalidateRect(window, nullptr, TRUE);
       if (list_box_ != nullptr) {
         InvalidateRect(list_box_, nullptr, TRUE);
       }
@@ -171,10 +296,60 @@ LRESULT Win32App::HandlePopupMessage(HWND window, UINT message, WPARAM wparam, L
     case WM_MEASUREITEM: {
       auto* measure_item = reinterpret_cast<MEASUREITEMSTRUCT*>(lparam);
       if (measure_item != nullptr && measure_item->CtlType == ODT_LISTBOX) {
-        measure_item->itemHeight = 24;
+        measure_item->itemHeight = 56;
         return TRUE;
       }
       break;
+    }
+    case WM_ERASEBKGND:
+      return 1;
+    case WM_PAINT: {
+      PAINTSTRUCT paint{};
+      HDC dc = BeginPaint(window, &paint);
+      RECT client_rect{};
+      GetClientRect(window, &client_rect);
+      FillRect(
+          dc,
+          &client_rect,
+          popup_window_background_brush_ != nullptr
+              ? popup_window_background_brush_
+              : static_cast<HBRUSH>(GetStockObject(WHITE_BRUSH)));
+
+      const auto draw_surface = [&](const RECT& rect) {
+        if (rect.right <= rect.left || rect.bottom <= rect.top) {
+          return;
+        }
+        const HGDIOBJ old_brush = SelectObject(
+            dc,
+            popup_surface_brush_ != nullptr
+                ? popup_surface_brush_
+                : static_cast<HBRUSH>(GetStockObject(WHITE_BRUSH)));
+        const HGDIOBJ old_pen = SelectObject(
+            dc,
+            popup_surface_border_pen_ != nullptr
+                ? popup_surface_border_pen_
+                : static_cast<HPEN>(GetStockObject(BLACK_PEN)));
+        RoundRect(dc, rect.left, rect.top, rect.right, rect.bottom, kPopupCardRadius, kPopupCardRadius);
+        SelectObject(dc, old_pen);
+        SelectObject(dc, old_brush);
+      };
+
+      draw_surface(popup_search_card_rect_);
+      draw_surface(popup_list_card_rect_);
+      draw_surface(popup_preview_card_rect_);
+
+      EndPaint(window, &paint);
+      return 0;
+    }
+    case WM_CTLCOLOREDIT:
+    case WM_CTLCOLORLISTBOX: {
+      HDC dc = reinterpret_cast<HDC>(wparam);
+      SetTextColor(dc, kPopupPrimaryText);
+      SetBkColor(dc, kPopupInputBackground);
+      return reinterpret_cast<INT_PTR>(
+          popup_input_brush_ != nullptr
+              ? popup_input_brush_
+              : static_cast<HBRUSH>(GetStockObject(WHITE_BRUSH)));
     }
     case WM_SETFOCUS:
       if (settings_.popup.show_search && search_edit_ != nullptr) {
@@ -207,6 +382,35 @@ LRESULT Win32App::HandlePopupMessage(HWND window, UINT message, WPARAM wparam, L
       break;
     case WM_CLOSE:
       HidePopup();
+      return 0;
+    case WM_DESTROY:
+      if (popup_ui_font_ != nullptr) {
+        DeleteObject(popup_ui_font_);
+        popup_ui_font_ = nullptr;
+      }
+      if (popup_ui_emphasis_font_ != nullptr) {
+        DeleteObject(popup_ui_emphasis_font_);
+        popup_ui_emphasis_font_ = nullptr;
+      }
+      if (popup_window_background_brush_ != nullptr) {
+        DeleteObject(popup_window_background_brush_);
+        popup_window_background_brush_ = nullptr;
+      }
+      if (popup_surface_brush_ != nullptr) {
+        DeleteObject(popup_surface_brush_);
+        popup_surface_brush_ = nullptr;
+      }
+      if (popup_input_brush_ != nullptr) {
+        DeleteObject(popup_input_brush_);
+        popup_input_brush_ = nullptr;
+      }
+      if (popup_surface_border_pen_ != nullptr) {
+        DeleteObject(popup_surface_border_pen_);
+        popup_surface_border_pen_ = nullptr;
+      }
+      popup_search_card_rect_ = RECT{0, 0, 0, 0};
+      popup_list_card_rect_ = RECT{0, 0, 0, 0};
+      popup_preview_card_rect_ = RECT{0, 0, 0, 0};
       return 0;
     default:
       break;
