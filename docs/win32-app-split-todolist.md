@@ -22,7 +22,11 @@
 - [x] 将匿名命名空间的大块工具与常量拆到 `src/app/win32_app_anon.inc`
 - [x] 将设置页核心逻辑拆到 `src/app/win32_app_settings_core.inc`
 - [x] 将设置页消息处理拆到 `src/app/win32_app_settings_message.inc`
-- [x] 主文件 `src/app/win32_app.cpp` 从约 4000 行降到约 2000 行
+- [x] 将生命周期/托盘逻辑拆到 `src/app/win32_app_lifecycle_tray.inc`
+- [x] 将弹窗/输入/剪贴板逻辑拆到 `src/app/win32_app_popup_input.inc`
+- [x] 将窗口消息处理拆到 `src/app/win32_app_message_handlers.inc`
+- [x] 将静态窗口过程拆到 `src/app/win32_app_window_procs.inc`
+- [x] 主文件 `src/app/win32_app.cpp` 从约 4000 行降到约 170 行（最小编排入口）
 - [ ] 下一步把 `.inc` 片段进一步收敛为独立 `.cpp` 编译单元（进入文档阶段 3/4/5）
 
 ## 目标目录结构（拆分后）
