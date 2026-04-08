@@ -7,6 +7,7 @@ add_library(maccy_core STATIC
   core/search.cpp
   core/search_highlight.cpp
   core/settings.cpp
+  core/settings_snapshot.cpp
 )
 
 target_include_directories(maccy_core PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})

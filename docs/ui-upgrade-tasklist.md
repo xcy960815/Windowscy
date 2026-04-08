@@ -10,10 +10,10 @@
 
 ## 当前优先级
 
-1. 完成 Win32 设置页止血升级
-2. 统一主弹窗样式基线
-3. 抽离设置桥接层，支撑 WinUI 3 设置页 PoC
-4. 用 PoC 结果决定是否推进全面迁移
+1. 抽离设置桥接层，支撑 WinUI 3 设置页 PoC
+2. 在 Windows 环境中启动 WinUI 3 设置页 PoC
+3. 用 PoC 结果决定是否继续投入 Win32 自绘优化
+4. 再决定主弹窗是否迁移
 
 ## 任务拆分
 
@@ -46,7 +46,7 @@
 
 ### C. UI 基础设施
 
-- 抽一个 `SettingsViewModel` 或 `SettingsSnapshot` 层，隔离 UI 控件和 `AppSettings`
+- 已完成：抽出 `SettingsSnapshot` 层，隔离 UI 编辑状态和 `AppSettings`
 - 整理颜色、字体、圆角、间距等设计 token，避免样式散落在消息处理代码里
 - 为设置页和主弹窗分别列出回归检查清单
 
@@ -57,6 +57,7 @@
 
 ### D. WinUI 3 设置页 PoC
 
+- 已完成：在 `src/core` 落地 `SettingsSnapshot` 桥接层
 - 范围只覆盖 `General` 和 `Appearance`
 - 读取现有设置快照，修改后通过显式 `Apply` 提交
 - 不接管托盘、热键、剪贴板监听和主消息循环
@@ -76,7 +77,7 @@
 
 ## 建议执行顺序
 
-1. 先补完 Win32 设置页剩余细节并做人工回归
-2. 接着统一主弹窗样式和状态表现
-3. 然后抽设置桥接层
-4. 最后在 Windows 环境中启动 WinUI 3 设置页 PoC
+1. 先在 Windows 环境中建立 WinUI 3 设置页实验工程
+2. 用 `SettingsSnapshot` 打通 `General` 页
+3. 再补 `Appearance` 页并验证 Apply / Save 流程
+4. 最后根据 PoC 结果决定 Win32 设置页是否继续投入

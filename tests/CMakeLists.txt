@@ -61,3 +61,11 @@ add_executable(maccy_ignore_rules_test
 target_link_libraries(maccy_ignore_rules_test PRIVATE maccy_core)
 
 add_test(NAME maccy_ignore_rules_test COMMAND maccy_ignore_rules_test)
+
+add_executable(maccy_settings_snapshot_test
+  settings_snapshot_test.cpp
+)
+
+target_link_libraries(maccy_settings_snapshot_test PRIVATE maccy_core)
+
+add_test(NAME maccy_settings_snapshot_test COMMAND maccy_settings_snapshot_test)
