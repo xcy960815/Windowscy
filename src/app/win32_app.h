@@ -175,6 +175,11 @@ class Win32App {
   void OpenSettingsWindow();
 
   /**
+   * @brief 打开旧版 Win32 设置窗口
+   */
+  void OpenLegacySettingsWindow();
+
+  /**
    * @brief 关闭设置窗口
    */
   void CloseSettingsWindow();
@@ -396,6 +401,12 @@ class Win32App {
    * @return std::filesystem::path 设置路径
    */
   std::filesystem::path ResolveSettingsPath() const;
+
+  /**
+   * @brief 尝试打开现代设置窗口
+   * @return bool 是否成功启动现代设置窗口
+   */
+  bool TryOpenModernSettingsWindow() const;
 
   // ========== 消息处理方法 ==========
 

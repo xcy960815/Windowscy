@@ -42,6 +42,14 @@ constexpr int kSettingsSidebarSummaryHeight = 116;
 }  // namespace
 
 void Win32App::OpenSettingsWindow() {
+  if (TryOpenModernSettingsWindow()) {
+    return;
+  }
+
+  OpenLegacySettingsWindow();
+}
+
+void Win32App::OpenLegacySettingsWindow() {
   active_double_click_modifier_flags_ = 0;
   double_click_modifier_detector_.Reset();
 
@@ -77,6 +85,48 @@ void Win32App::OpenSettingsWindow() {
   SyncSettingsWindowControls();
   ShowWindow(settings_window_, SW_SHOWNORMAL);
   SetForegroundWindow(settings_window_);
+}
+
+bool Win32App::TryOpenModernSettingsWindow() const {
+  const auto executable_path = ResolveModernSettingsExecutablePath();
+  if (executable_path.empty()) {
+    return false;
+  }
+
+  std::wstring command_line = QuoteCommandLineArgument(executable_path.wstring());
+  if (!settings_path_.empty()) {
+    command_line += L" --settings-path ";
+    command_line += QuoteCommandLineArgument(settings_path_.wstring());
+  }
+  if (use_chinese_ui_) {
+    command_line += L" --lang zh-CN";
+  }
+
+  STARTUPINFOW startup_info{};
+  startup_info.cb = sizeof(startup_info);
+  PROCESS_INFORMATION process_info{};
+
+  std::vector<wchar_t> mutable_command_line(command_line.begin(), command_line.end());
+  mutable_command_line.push_back(L'\0');
+
+  const BOOL started = CreateProcessW(
+      executable_path.c_str(),
+      mutable_command_line.data(),
+      nullptr,
+      nullptr,
+      FALSE,
+      CREATE_UNICODE_ENVIRONMENT,
+      nullptr,
+      executable_path.parent_path().c_str(),
+      &startup_info,
+      &process_info);
+  if (started == FALSE) {
+    return false;
+  }
+
+  CloseHandle(process_info.hThread);
+  CloseHandle(process_info.hProcess);
+  return true;
 }
 
 void Win32App::CloseSettingsWindow() {

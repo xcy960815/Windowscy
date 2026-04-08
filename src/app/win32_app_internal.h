@@ -154,6 +154,9 @@ std::wstring DescribeOpenTrigger(bool use_chinese_ui, const AppSettings& setting
 std::wstring ReadWindowText(HWND window);
 bool NotifyExistingInstance();
 void CloseLegacyInstances();
+std::filesystem::path ResolveCurrentExecutablePath();
+std::filesystem::path ResolveModernSettingsExecutablePath();
+std::wstring QuoteCommandLineArgument(const std::wstring& value);
 
 }  // namespace maccy
 

@@ -36,6 +36,20 @@
 - `Apply` / `Save` 的真实持久化回写
 - 主弹窗替换
 
+## 与主程序桥接
+
+主程序现在会优先尝试启动同目录下的：
+
+- `ClipLoom.SettingsPoC.exe`
+
+或：
+
+- `ClipLoom.SettingsPoC/ClipLoom.SettingsPoC.exe`
+
+如果都不存在，才会回退到旧的 Win32 设置页。
+
+也就是说，在 Windows 上只要把这个 WinUI 3 工程编译成上述路径之一，托盘菜单里的“设置”就可以先跳到新的设置壳，而不需要先彻底删掉旧设置页。
+
 ## 设计目标
 
 这个 PoC 的目标不是“先把逻辑全接完”，而是先验证两件事：

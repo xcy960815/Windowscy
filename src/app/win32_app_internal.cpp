@@ -39,6 +39,57 @@ void ShowDialog(HWND owner, std::wstring_view message, UINT flags) {
   MessageBoxW(owner, text.c_str(), kWindowTitle, MB_OK | flags);
 }
 
+std::filesystem::path ResolveCurrentExecutablePath() {
+  std::wstring path(MAX_PATH, L'\0');
+
+  while (true) {
+    const DWORD length = GetModuleFileNameW(nullptr, path.data(), static_cast<DWORD>(path.size()));
+    if (length == 0) {
+      return {};
+    }
+    if (length < path.size() - 1) {
+      path.resize(length);
+      return std::filesystem::path(path);
+    }
+    path.resize(path.size() * 2);
+  }
+}
+
+std::filesystem::path ResolveModernSettingsExecutablePath() {
+  const auto current_executable = ResolveCurrentExecutablePath();
+  if (current_executable.empty()) {
+    return {};
+  }
+
+  const auto executable_dir = current_executable.parent_path();
+  const auto sibling_executable = executable_dir / "ClipLoom.SettingsPoC.exe";
+  if (std::filesystem::exists(sibling_executable)) {
+    return sibling_executable;
+  }
+
+  const auto nested_executable = executable_dir / "ClipLoom.SettingsPoC" / "ClipLoom.SettingsPoC.exe";
+  if (std::filesystem::exists(nested_executable)) {
+    return nested_executable;
+  }
+
+  return {};
+}
+
+std::wstring QuoteCommandLineArgument(const std::wstring& value) {
+  std::wstring quoted;
+  quoted.reserve(value.size() + 2);
+  quoted.push_back(L'"');
+  for (wchar_t ch : value) {
+    if (ch == L'"') {
+      quoted += L"\\\"";
+    } else {
+      quoted.push_back(ch);
+    }
+  }
+  quoted.push_back(L'"');
+  return quoted;
+}
+
 /**
  * @brief 加载指定大小的应用图标
  * @param instance 应用程序实例
