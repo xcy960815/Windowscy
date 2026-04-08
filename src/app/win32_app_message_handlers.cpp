@@ -247,20 +247,26 @@ LRESULT Win32App::HandlePopupMessage(HWND window, UINT message, WPARAM wparam, L
               outer_padding + available_width,
               content_top + content_height,
           };
+          const int list_left = static_cast<int>(popup_list_card_rect_.left) + card_inset;
+          const int list_top = static_cast<int>(popup_list_card_rect_.top) + card_inset;
           MoveWindow(
               list_box_,
-              popup_list_card_rect_.left + card_inset,
-              popup_list_card_rect_.top + card_inset,
+              list_left,
+              list_top,
               list_content_width,
               content_inner_height,
               TRUE);
-          const int preview_content_width = std::max(
-              120,
-              static_cast<int>(popup_preview_card_rect_.right - popup_preview_card_rect_.left) - card_inset * 2);
+          const int preview_left = static_cast<int>(popup_preview_card_rect_.left) + card_inset;
+          const int preview_top = static_cast<int>(popup_preview_card_rect_.top) + card_inset;
+          const int preview_rect_width =
+              static_cast<int>(popup_preview_card_rect_.right - popup_preview_card_rect_.left);
+          const int preview_content_width = preview_rect_width - card_inset * 2 > 120
+                                                ? preview_rect_width - card_inset * 2
+                                                : 120;
           MoveWindow(
               preview_edit_,
-              popup_preview_card_rect_.left + card_inset,
-              popup_preview_card_rect_.top + card_inset,
+              preview_left,
+              preview_top,
               preview_content_width,
               content_inner_height,
               TRUE);
@@ -274,8 +280,8 @@ LRESULT Win32App::HandlePopupMessage(HWND window, UINT message, WPARAM wparam, L
           };
           MoveWindow(
               list_box_,
-              popup_list_card_rect_.left + card_inset,
-              popup_list_card_rect_.top + card_inset,
+              static_cast<int>(popup_list_card_rect_.left) + card_inset,
+              static_cast<int>(popup_list_card_rect_.top) + card_inset,
               std::max(220, available_width - card_inset * 2),
               std::max(120, content_height - card_inset * 2),
               TRUE);
