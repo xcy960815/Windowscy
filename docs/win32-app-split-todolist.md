@@ -26,8 +26,10 @@
 - [x] 将弹窗/输入/剪贴板逻辑拆到 `src/app/win32_app_popup_input.inc`
 - [x] 将窗口消息处理拆到 `src/app/win32_app_message_handlers.inc`
 - [x] 将静态窗口过程拆到 `src/app/win32_app_window_procs.inc`
-- [x] 主文件 `src/app/win32_app.cpp` 从约 4000 行降到约 170 行（最小编排入口）
-- [ ] 下一步把 `.inc` 片段进一步收敛为独立 `.cpp` 编译单元（进入文档阶段 3/4/5）
+- [x] 新增 `src/app/win32_app_internal.h/.cpp` 承载共享 helper 与内部常量
+- [x] 新增 `win32_app_lifecycle_tray.cpp` / `win32_app_popup_input.cpp` / `win32_app_message_handlers.cpp` / `win32_app_settings.cpp` / `win32_app_window_procs.cpp`
+- [x] 主文件 `src/app/win32_app.cpp` 收敛为入口与少量核心逻辑
+- [ ] 下一步移除剩余 `.inc` 文件，直接把实现内容并入对应 `.cpp`
 
 ## 目标目录结构（拆分后）
 

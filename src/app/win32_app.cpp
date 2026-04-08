@@ -1,45 +1,8 @@
-/**
- * @file win32_app.cpp
- * @brief Windows 应用程序主类实现
- */
-
 #ifdef _WIN32
 
-#include "app/win32_app.h"
-#include "app/resources/resource.h"
-
-#include <commctrl.h>
-#include <shellapi.h>
-#include <windows.h>
-
-#include <algorithm>
-#include <cstdlib>
-#include <filesystem>
-#include <optional>
-#include <sstream>
-#include <string>
-#include <string_view>
-#include <system_error>
-#include <vector>
-
-#include "core/history_item.h"
-#include "core/history_persistence.h"
-#include "core/ignore_rules.h"
-#include "core/search.h"
-#include "core/search_highlight.h"
-#include "platform/win32/clipboard.h"
-#include "platform/win32/input.h"
-#include "platform/win32/source_app.h"
-#include "platform/win32/startup.h"
-#include "platform/win32/utf.h"
+#include "app/win32_app_internal.h"
 
 namespace maccy {
-
-namespace {
-
-#include "app/win32_app_anon.inc"
-
-}  // namespace
 
 int Win32App::Run(HINSTANCE instance, int show_command) {
   (void)show_command;
@@ -67,10 +30,6 @@ int Win32App::Run(HINSTANCE instance, int show_command) {
   Shutdown();
   return static_cast<int>(message.wParam);
 }
-
-#include "app/win32_app_lifecycle_tray.inc"
-
-#include "app/win32_app_settings_core.inc"
 
 void Win32App::LoadSettings() {
   settings_ = LoadSettingsFile(settings_path_);
@@ -140,16 +99,11 @@ void Win32App::ShowStartupGuide() {
         L" or click the tray icon to open clipboard history.",
         L"，或点击托盘图标打开剪贴板历史记录。");
   }
-  ShowDialog(
-      controller_window_,
-      message,
-      MB_ICONINFORMATION);
+  ShowDialog(controller_window_, message, MB_ICONINFORMATION);
 
   settings_.show_startup_guide = false;
   PersistSettings();
 }
-
-#include "app/win32_app_popup_input.inc"
 
 std::filesystem::path Win32App::ResolveHistoryPath() const {
   return ResolveAppDataDirectory() / "history.dat";
@@ -158,12 +112,6 @@ std::filesystem::path Win32App::ResolveHistoryPath() const {
 std::filesystem::path Win32App::ResolveSettingsPath() const {
   return ResolveAppDataDirectory() / "settings.dat";
 }
-
-#include "app/win32_app_message_handlers.inc"
-
-#include "app/win32_app_settings_message.inc"
-
-#include "app/win32_app_window_procs.inc"
 
 }  // namespace maccy
 
