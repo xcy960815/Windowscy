@@ -21,8 +21,8 @@ PoC 只验证三件事：
 
 首轮只做：
 
-- `General`
-- `Appearance`
+- `Settings`
+- `Preview`
 
 明确不做：
 
@@ -47,7 +47,7 @@ experiments/winui3-settings-poc/
     MainWindow.xaml.cpp
     Views/
       GeneralPage.xaml
-      AppearancePage.xaml
+      PreviewPage.xaml
     ViewModels/
       SettingsViewModel.h
       SettingsViewModel.cpp

@@ -101,17 +101,17 @@
                     </NavigationView.Header>
                     <NavigationView.MenuItems>
                         <NavigationViewItem
-                            Content="General"
-                            Tag="general">
+                            Content="Settings"
+                            Tag="settings">
                             <NavigationViewItem.Icon>
                                 <SymbolIcon Symbol="Home" />
                             </NavigationViewItem.Icon>
                         </NavigationViewItem>
                         <NavigationViewItem
-                            Content="Appearance"
-                            Tag="appearance">
+                            Content="Preview"
+                            Tag="preview">
                             <NavigationViewItem.Icon>
-                                <SymbolIcon Symbol="Edit" />
+                                <SymbolIcon Symbol="Contact" />
                             </NavigationViewItem.Icon>
                         </NavigationViewItem>
                     </NavigationView.MenuItems>
@@ -136,7 +136,7 @@
                             Foreground="{StaticResource ClipLoomTextBrush}"
                             FontSize="28"
                             FontWeight="SemiBold"
-                            Text="General" />
+                            Text="Settings" />
                         <TextBlock
                             x:Name="CurrentPageSummaryText"
                             Foreground="{StaticResource ClipLoomMutedBrush}"

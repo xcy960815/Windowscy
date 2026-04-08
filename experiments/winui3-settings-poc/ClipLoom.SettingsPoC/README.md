@@ -24,8 +24,8 @@
 当前 PoC 已经包含：
 
 - `App.xaml` / `MainWindow.xaml`
-- `GeneralPage`
-- `AppearancePage`
+- `GeneralPage`（配置页）
+- `PreviewPage`（预览模块）
 - `SettingsViewModel`
 - `settings_snapshot_adapter`
 

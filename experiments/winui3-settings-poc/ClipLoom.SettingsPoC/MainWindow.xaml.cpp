@@ -1,7 +1,7 @@
 #include "MainWindow.xaml.h"
 
-#include "Views/AppearancePage.xaml.h"
 #include "Views/GeneralPage.xaml.h"
+#include "Views/PreviewPage.xaml.h"
 
 using namespace winrt;
 using namespace Microsoft::UI::Xaml;
@@ -19,7 +19,7 @@ MainWindow::MainWindow()
 
   auto first_item = RootNavigationView().MenuItems().GetAt(0).try_as<NavigationViewItem>();
   RootNavigationView().SelectedItem(first_item);
-  NavigateToTag(L"general");
+  NavigateToTag(L"settings");
 }
 
 void MainWindow::NavigationViewSelectionChanged(
@@ -53,20 +53,20 @@ void MainWindow::CloseButtonClick(
 }
 
 void MainWindow::NavigateToTag(hstring const& tag) {
-  if (tag == L"appearance") {
-    ContentFrame().Navigate(xaml_typename<winrt::ClipLoom::SettingsPoC::Views::AppearancePage>());
-    CurrentPageTagText().Text(L"Appearance");
+  if (tag == L"preview") {
+    ContentFrame().Navigate(xaml_typename<winrt::ClipLoom::SettingsPoC::Views::PreviewPage>());
+    CurrentPageTagText().Text(L"Preview");
     CurrentPageSummaryText().Text(
-        L"Validate preview, search visibility and shell presentation with WinUI controls.");
-    SetStatus(L"Appearance page loaded from the demo snapshot.");
+        L"Replace the owner-draw list and read-only preview edit control with native WinUI layout.");
+    SetStatus(L"Preview page loaded. Use this to judge the new history + detail presentation.");
     return;
   }
 
   ContentFrame().Navigate(xaml_typename<winrt::ClipLoom::SettingsPoC::Views::GeneralPage>());
-  CurrentPageTagText().Text(L"General");
+  CurrentPageTagText().Text(L"Settings");
   CurrentPageSummaryText().Text(
       L"Validate opening trigger, startup behavior and capture toggles with Fluent components.");
-  SetStatus(L"General page loaded from the demo snapshot.");
+  SetStatus(L"Settings page loaded. This is the new configuration shell direction.");
 }
 
 void MainWindow::SetStatus(hstring const& message) {
