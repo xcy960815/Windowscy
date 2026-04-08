@@ -19,17 +19,11 @@
 
 ## 当前进度（2026-04-08）
 
-- [x] 将匿名命名空间的大块工具与常量拆到 `src/app/win32_app_anon.inc`
-- [x] 将设置页核心逻辑拆到 `src/app/win32_app_settings_core.inc`
-- [x] 将设置页消息处理拆到 `src/app/win32_app_settings_message.inc`
-- [x] 将生命周期/托盘逻辑拆到 `src/app/win32_app_lifecycle_tray.inc`
-- [x] 将弹窗/输入/剪贴板逻辑拆到 `src/app/win32_app_popup_input.inc`
-- [x] 将窗口消息处理拆到 `src/app/win32_app_message_handlers.inc`
-- [x] 将静态窗口过程拆到 `src/app/win32_app_window_procs.inc`
 - [x] 新增 `src/app/win32_app_internal.h/.cpp` 承载共享 helper 与内部常量
 - [x] 新增 `win32_app_lifecycle_tray.cpp` / `win32_app_popup_input.cpp` / `win32_app_message_handlers.cpp` / `win32_app_settings.cpp` / `win32_app_window_procs.cpp`
+- [x] 已将原有 `.inc` 内容全部并入对应 `.cpp`，并删除所有 `.inc` 文件
 - [x] 主文件 `src/app/win32_app.cpp` 收敛为入口与少量核心逻辑
-- [ ] 下一步移除剩余 `.inc` 文件，直接把实现内容并入对应 `.cpp`
+- [ ] 下一步继续把模块边界从“职责拆分”推进到“语义拆分”，例如把 `popup`、`pin editor`、`tray`、`input` 再拆成更细的 `.cpp`
 
 ## 目标目录结构（拆分后）
 
