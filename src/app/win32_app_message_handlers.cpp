@@ -233,6 +233,8 @@ LRESULT Win32App::HandlePopupMessage(HWND window, UINT message, WPARAM wparam, L
               kPreviewMinWidth,
               std::max(kPreviewMinWidth, available_width - minimum_list_width - kPopupPadding));
           const int list_width = std::max(minimum_list_width, available_width - preview_width - kPopupPadding);
+          const int list_content_width = std::max(180, list_width - card_inset * 2);
+          const int content_inner_height = std::max(120, content_height - card_inset * 2);
           popup_list_card_rect_ = RECT{
               outer_padding,
               content_top,
@@ -249,15 +251,18 @@ LRESULT Win32App::HandlePopupMessage(HWND window, UINT message, WPARAM wparam, L
               list_box_,
               popup_list_card_rect_.left + card_inset,
               popup_list_card_rect_.top + card_inset,
-              std::max(180, list_width - card_inset * 2),
-              std::max(120, content_height - card_inset * 2),
+              list_content_width,
+              content_inner_height,
               TRUE);
+          const int preview_content_width = std::max(
+              120,
+              static_cast<int>(popup_preview_card_rect_.right - popup_preview_card_rect_.left) - card_inset * 2);
           MoveWindow(
               preview_edit_,
               popup_preview_card_rect_.left + card_inset,
               popup_preview_card_rect_.top + card_inset,
-              std::max(120, popup_preview_card_rect_.right - popup_preview_card_rect_.left - card_inset * 2),
-              std::max(120, content_height - card_inset * 2),
+              preview_content_width,
+              content_inner_height,
               TRUE);
           ShowWindow(preview_edit_, SW_SHOW);
         } else {
