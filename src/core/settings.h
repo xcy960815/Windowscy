@@ -11,8 +11,8 @@
 #include <vector>
 
 #include "core/double_click_modifier.h"
-#include "core/history_store.h"
-#include "core/search.h"
+#include "core/history_types.h"
+#include "core/search_mode.h"
 
 namespace maccy {
 

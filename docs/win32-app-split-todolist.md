@@ -23,6 +23,8 @@
 - [x] 新增 `win32_app_lifecycle_tray.cpp` / `win32_app_popup_input.cpp` / `win32_app_message_handlers.cpp` / `win32_app_settings.cpp` / `win32_app_window_procs.cpp`
 - [x] 已将原有 `.inc` 内容全部并入对应 `.cpp`，并删除所有 `.inc` 文件
 - [x] 主文件 `src/app/win32_app.cpp` 收敛为入口与少量核心逻辑
+- [x] 新增 `src/app/run_win32_app.h`，让 `main_win32.cpp` 不再直接依赖 `win32_app.h`
+- [x] 新增 `src/core/history_types.h` / `src/core/search_mode.h`，开始收缩公共头的传递依赖
 - [ ] 下一步继续把模块边界从“职责拆分”推进到“语义拆分”，例如把 `popup`、`pin editor`、`tray`、`input` 再拆成更细的 `.cpp`
 
 ## 目标目录结构（拆分后）

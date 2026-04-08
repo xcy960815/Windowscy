@@ -8,7 +8,7 @@
 #include <string_view>
 #include <vector>
 
-#include "core/search.h"
+#include "core/search_mode.h"
 
 namespace maccy {
 

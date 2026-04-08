@@ -3,9 +3,7 @@
  * @brief Windows 应用程序入口点
  */
 
-#include <windows.h>
-
-#include "app/win32_app.h"
+#include "app/run_win32_app.h"
 
 /**
  * @brief Windows 应用程序入口点
@@ -15,6 +13,5 @@
  * @return int 应用程序退出代码
  */
 int WINAPI wWinMain(HINSTANCE instance, HINSTANCE, PWSTR, int show_command) {
-  maccy::Win32App app;
-  return app.Run(instance, show_command);
+  return maccy::RunWin32App(instance, show_command);
 }

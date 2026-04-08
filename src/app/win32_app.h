@@ -562,7 +562,15 @@ class Win32App {
   HWND settings_window_ = nullptr;                                         /**< 设置窗口句柄 */
   HWND settings_header_title_ = nullptr;                                   /**< 设置页标题句柄 */
   HWND settings_header_subtitle_ = nullptr;                                /**< 设置页副标题句柄 */
-  HWND settings_tab_ = nullptr;                                           /**< 设置标签页句柄 */
+  HWND settings_nav_general_button_ = nullptr;                             /**< 常规导航按钮 */
+  HWND settings_nav_storage_button_ = nullptr;                             /**< 存储导航按钮 */
+  HWND settings_nav_appearance_button_ = nullptr;                          /**< 外观导航按钮 */
+  HWND settings_nav_pins_button_ = nullptr;                                /**< 置顶导航按钮 */
+  HWND settings_nav_ignore_button_ = nullptr;                              /**< 忽略导航按钮 */
+  HWND settings_nav_advanced_button_ = nullptr;                            /**< 高级导航按钮 */
+  HWND settings_save_button_ = nullptr;                                    /**< 保存按钮 */
+  HWND settings_apply_button_ = nullptr;                                   /**< 应用按钮 */
+  HWND settings_close_button_ = nullptr;                                   /**< 关闭按钮 */
   HWND settings_general_page_ = nullptr;                                   /**< 设置常规页面句柄 */
   HWND settings_storage_page_ = nullptr;                                  /**< 设置存储页面句柄 */
   HWND settings_appearance_page_ = nullptr;                               /**< 设置外观页面句柄 */
@@ -639,6 +647,7 @@ class Win32App {
   std::vector<SettingsTextElement> settings_text_elements_;                /**< 设置文本样式角色 */
   std::vector<SettingsSection> settings_sections_;                         /**< 设置页卡片区域 */
   DoubleClickModifierKeyDetector double_click_modifier_detector_;         /**< 双击修饰符检测器 */
+  int settings_current_page_index_ = 0;                                    /**< 当前设置页索引 */
   DoubleClickModifierKey settings_double_click_modifier_selection_ = DoubleClickModifierKey::kNone; /**< 设置中的双击修饰符选择 */
   std::uint64_t pin_editor_item_id_ = 0;                                 /**< 固定编辑器项 ID */
   bool pin_editor_rename_only_ = false;                                   /**< 固定编辑器是否只重命名 */

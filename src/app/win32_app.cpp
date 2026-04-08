@@ -4,6 +4,11 @@
 
 namespace maccy {
 
+int RunWin32App(HINSTANCE instance, int show_command) {
+  Win32App app;
+  return app.Run(instance, show_command);
+}
+
 int Win32App::Run(HINSTANCE instance, int show_command) {
   (void)show_command;
 
