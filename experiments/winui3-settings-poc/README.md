@@ -84,7 +84,8 @@ experiments/winui3-settings-poc/
 ## 当前状态
 
 - 已完成：`SettingsSnapshot` 桥接层落地并有单元测试覆盖
-- 未完成：WinUI 3 工程文件需要在 Windows + Visual Studio 环境中生成
+- 已完成：`ClipLoom.SettingsPoC/` 源码骨架，包括 `App`、`MainWindow`、`GeneralPage`、`AppearancePage`
+- 未完成：WinUI 3 的 `.sln` / `.vcxproj` 仍需要在 Windows + Visual Studio 环境中从官方模板生成
 
 ## 参考文档
 

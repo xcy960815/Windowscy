@@ -1,0 +1,27 @@
+<Application
+    x:Class="ClipLoom.SettingsPoC.App"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:local="using:ClipLoom.SettingsPoC">
+    <Application.Resources>
+        <ResourceDictionary>
+            <ResourceDictionary.MergedDictionaries>
+                <XamlControlsResources xmlns="using:Microsoft.UI.Xaml.Controls" />
+            </ResourceDictionary.MergedDictionaries>
+
+            <Color x:Key="ClipLoomAccentColor">#2B65D9</Color>
+            <Color x:Key="ClipLoomShellColor">#F5F7FB</Color>
+            <Color x:Key="ClipLoomCardColor">#FFFFFFFF</Color>
+            <Color x:Key="ClipLoomStrokeColor">#FFD8E0EC</Color>
+            <Color x:Key="ClipLoomTextColor">#FF17202D</Color>
+            <Color x:Key="ClipLoomMutedColor">#FF5F6E84</Color>
+
+            <SolidColorBrush x:Key="ClipLoomAccentBrush" Color="{StaticResource ClipLoomAccentColor}" />
+            <SolidColorBrush x:Key="ClipLoomShellBrush" Color="{StaticResource ClipLoomShellColor}" />
+            <SolidColorBrush x:Key="ClipLoomCardBrush" Color="{StaticResource ClipLoomCardColor}" />
+            <SolidColorBrush x:Key="ClipLoomStrokeBrush" Color="{StaticResource ClipLoomStrokeColor}" />
+            <SolidColorBrush x:Key="ClipLoomTextBrush" Color="{StaticResource ClipLoomTextColor}" />
+            <SolidColorBrush x:Key="ClipLoomMutedBrush" Color="{StaticResource ClipLoomMutedColor}" />
+        </ResourceDictionary>
+    </Application.Resources>
+</Application>

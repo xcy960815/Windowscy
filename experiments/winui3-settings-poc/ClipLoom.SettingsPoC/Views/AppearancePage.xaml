@@ -1,0 +1,91 @@
+<Page
+    x:Class="ClipLoom.SettingsPoC.Views.AppearancePage"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    mc:Ignorable="d">
+    <ScrollViewer VerticalScrollBarVisibility="Auto">
+        <StackPanel Margin="24" Spacing="16">
+            <Border
+                Padding="24"
+                Background="{StaticResource ClipLoomCardBrush}"
+                BorderBrush="{StaticResource ClipLoomStrokeBrush}"
+                BorderThickness="1"
+                CornerRadius="20">
+                <StackPanel Spacing="18">
+                    <StackPanel Spacing="4">
+                        <TextBlock
+                            Foreground="{StaticResource ClipLoomTextBrush}"
+                            FontSize="24"
+                            FontWeight="SemiBold"
+                            Text="Popup Layout" />
+                        <TextBlock
+                            Foreground="{StaticResource ClipLoomMutedBrush}"
+                            FontSize="14"
+                            Text="Use native layout controls instead of hand-positioned Win32 rectangles." />
+                    </StackPanel>
+
+                    <Grid ColumnSpacing="24">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+
+                        <StackPanel Spacing="14">
+                            <ToggleSwitch x:Name="ShowSearchToggle" Header="Show search bar" IsOn="True" />
+                            <ToggleSwitch x:Name="ShowPreviewToggle" Header="Show preview panel" IsOn="True" />
+                            <ToggleSwitch x:Name="RememberPositionToggle" Header="Remember last popup position" IsOn="True" />
+                        </StackPanel>
+
+                        <StackPanel Grid.Column="1" Spacing="14">
+                            <ComboBox x:Name="PinPositionCombo" Header="Pinned item position">
+                                <x:String>Top</x:String>
+                                <x:String>Bottom</x:String>
+                            </ComboBox>
+                            <ComboBox x:Name="SearchModeCombo" Header="Search mode">
+                                <x:String>Mixed</x:String>
+                                <x:String>Exact</x:String>
+                                <x:String>Fuzzy</x:String>
+                                <x:String>Regexp</x:String>
+                            </ComboBox>
+                        </StackPanel>
+                    </Grid>
+                </StackPanel>
+            </Border>
+
+            <Border
+                Padding="24"
+                Background="{StaticResource ClipLoomCardBrush}"
+                BorderBrush="{StaticResource ClipLoomStrokeBrush}"
+                BorderThickness="1"
+                CornerRadius="20">
+                <StackPanel Spacing="16">
+                    <StackPanel Spacing="4">
+                        <TextBlock
+                            Foreground="{StaticResource ClipLoomTextBrush}"
+                            FontSize="24"
+                            FontWeight="SemiBold"
+                            Text="Visual Direction" />
+                        <TextBlock
+                            Foreground="{StaticResource ClipLoomMutedBrush}"
+                            FontSize="14"
+                            Text="This page should answer whether WinUI 3 gives enough visual quality to stop investing in owner-draw Win32 styling." />
+                    </StackPanel>
+
+                    <StackPanel Orientation="Horizontal" Spacing="12">
+                        <InfoBadge Value="Fluent" />
+                        <InfoBadge Value="Native" />
+                        <InfoBadge Value="No custom checkbox painting" />
+                    </StackPanel>
+
+                    <TextBlock
+                        Foreground="{StaticResource ClipLoomMutedBrush}"
+                        FontSize="13"
+                        TextWrapping="Wrap"
+                        Text="Once this prototype is hosted from the main app, these controls should bind to SettingsSnapshot instead of maintaining duplicate ad-hoc state." />
+                </StackPanel>
+            </Border>
+        </StackPanel>
+    </ScrollViewer>
+</Page>

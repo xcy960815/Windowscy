@@ -58,6 +58,7 @@
 ### D. WinUI 3 设置页 PoC
 
 - 已完成：在 `src/core` 落地 `SettingsSnapshot` 桥接层
+- 已完成：在 `experiments/winui3-settings-poc/ClipLoom.SettingsPoC/` 落地 WinUI 3 页面源码骨架
 - 范围只覆盖 `General` 和 `Appearance`
 - 读取现有设置快照，修改后通过显式 `Apply` 提交
 - 不接管托盘、热键、剪贴板监听和主消息循环
@@ -78,6 +79,7 @@
 ## 建议执行顺序
 
 1. 先在 Windows 环境中建立 WinUI 3 设置页实验工程
-2. 用 `SettingsSnapshot` 打通 `General` 页
-3. 再补 `Appearance` 页并验证 Apply / Save 流程
-4. 最后根据 PoC 结果决定 Win32 设置页是否继续投入
+2. 导入 `experiments/winui3-settings-poc/ClipLoom.SettingsPoC/` 源码骨架
+3. 用 `SettingsSnapshot` 打通 `General` 页
+4. 再补 `Appearance` 页并验证 Apply / Save 流程
+5. 最后根据 PoC 结果决定 Win32 设置页是否继续投入
